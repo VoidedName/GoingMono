@@ -1,1 +1,1 @@
-"= GoingMono" 
+= GoingMono
