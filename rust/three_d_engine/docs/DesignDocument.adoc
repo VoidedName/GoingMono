@@ -1,0 +1,86 @@
+= Design Document
+Voided Name
+3.0, July 29, 2022: AsciiDoc article template
+:toc:
+:icons: font
+:url-quickref: https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/
+
+Design Doc for the VNEngine.
+
+== Goals
+
+My goal is to explore opengl and graphics rendering techniques. For this I will want to both learn how to leverage shaders and the graphics card, as well as implementing certain algorithms on the cpu. I plan to start with cpu implementations and then upgrading to gpu ones.
+
+== Overview
+
+=== Context View
+[plantuml]
+....
+@startuml
+component Client #red
+component VNEngine #green
+component Renderer #green
+
+Client --> VNEngine
+VNEngine --> Renderer
+@enduml
+....
+
+
+.Description
+|===
+|Component |Relation |Description
+
+|Client
+|External
+|Using system of the engine.
+
+|VNEngine
+|Internal
+|Provides a rendering loop and abstractions
+
+|Renderer
+|Internal
+|Specific drawing api abstraction
+|===
+
+=== Internal View
+[plantuml]
+....
+component VNEngine {
+    interface VNERunner {
+        setup(renderer)
+        tick(renderer)
+        shutdown()
+    }
+
+    class VNEngine {
+        new(runner: VNERunner)
+    }
+
+    VNEngine::new <-- VNERunner
+}
+
+component Renderer {
+
+    class Position {
+        x
+        y
+    }
+
+    enum Color {
+        RGB(r, g, b)
+    }
+
+    interface VNERenderer {
+        clear_screen(color)
+        draw_pixel(pos, color)
+    }
+    VNERunner::setup <-- VNERenderer
+    VNERunner::tick <-- VNERenderer
+
+    VNERenderer::clear_screen <-- Color
+    VNERenderer::draw_pixel <-- Color
+    VNERenderer::draw_pixel <-- Position
+}
+....
