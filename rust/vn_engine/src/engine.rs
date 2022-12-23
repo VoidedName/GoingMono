@@ -44,6 +44,8 @@ impl<T: VNERenderer + VNERendererCommit> VNEngine<T> {
         let mut event_loop = &mut self.event_loop;
         let renderer = &mut self.renderer;
 
+        runner.setup(renderer);
+
         event_loop.run_return(|event, _, control_flow| {
             *control_flow = ControlFlow::Poll;
 
@@ -60,7 +62,10 @@ impl<T: VNERenderer + VNERendererCommit> VNEngine<T> {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     window_id,
-                } => *control_flow = ControlFlow::Exit,
+                } => {
+                    runner.tear_down(renderer);
+                    *control_flow = ControlFlow::Exit
+                },
                 _ => (),
             }
         });
@@ -69,9 +74,9 @@ impl<T: VNERenderer + VNERendererCommit> VNEngine<T> {
 
 pub trait VNERunner {
     /// Do your setup code here
-    fn setup(&mut self) {}
+    fn setup(&mut self, renderer: &mut impl VNERenderer) {}
     /// Gets called every frame
     fn tick(&mut self, nano_delta: u128, renderer: &mut impl VNERenderer);
     /// do your teadown code here
-    fn tear_down(&mut self) {}
+    fn tear_down(&mut self, renderer: &mut impl VNERenderer) {}
 }

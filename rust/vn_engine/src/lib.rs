@@ -1,7 +1,7 @@
 use crate::color::RGBA;
 use crate::engine::{VNERunner, VNEngine};
 use crate::opengl::OpenGLRenderer;
-use crate::render::{Position, VNERenderer};
+use crate::render::{PixelPosition, VNERenderer};
 
 pub mod color;
 pub mod engine;

@@ -221,11 +221,13 @@ impl VNERenderer for OpenGLRenderer {
         }
     }
 
-    fn draw_pixel(&mut self, position: crate::render::Position, color: RGBA) {
-        if position.x < 0 || position.x >= self.width || position.y < 0 || position.y >= self.height {
+    fn draw_pixel(&mut self, position: crate::render::PixelPosition, color: RGBA) {
+        let x = position.x;
+        let y = position.y;
+        if x < 0 || x >= self.width || y < 0 || y >= self.height {
             return;
         }
-        let idx = self.xy_index(position.x, position.y);
+        let idx = self.xy_index(x, y);
         self.color_buffer[idx] = color;
     }
 

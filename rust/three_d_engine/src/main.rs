@@ -2,18 +2,24 @@ use rand::distributions::Uniform;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use std::f32::consts::PI;
-use std::ops;
+use std::{fs, ops};
 use std::process::Output;
-use vn_engine::color::{BLACK, RGBA, WHITE};
+use vn_engine::color::{BLACK, RGBA, VIOLET, WHITE};
 use vn_engine::engine::{VNERunner, VNEngine};
 use vn_engine::opengl::OpenGLRenderer;
-use vn_engine::render::{Position, VNERenderer};
+use vn_engine::render::{PixelPosition, VNERenderer};
 
 #[derive(Debug, Copy, Clone)]
 struct Vec3D {
     x: f32,
     y: f32,
     z: f32,
+}
+
+macro_rules! vec3d {
+    [$x:expr, $y:expr, $z:expr] => {
+        Vec3D { x: $x, y: $y, z: $z }
+    }
 }
 
 impl Vec3D {
@@ -71,6 +77,40 @@ struct Mesh {
     tris: Vec<Triangle>,
 }
 
+impl Mesh {
+    fn load_from_file(filename: &str) -> Result<Mesh, String> {
+        let content = fs::read_to_string(filename);
+        if let Err(e) = content { return Err(e.to_string()); }
+
+        let content = content.unwrap();
+        let mut lines = content.lines();
+        let mut vertices: Vec<Vec3D> = Vec::new();
+        let mut tris: Vec<Triangle> = Vec::new();
+
+        for line in lines {
+            if line.starts_with("v") {
+                let parts: Vec<&str> = line[2..].split(" ").collect();
+                let x: f32 = parts[0].parse().unwrap();
+                let y: f32 = parts[1].parse().unwrap();
+                let z: f32 = parts[2].parse().unwrap();
+                vertices.push(vec3d![x, y, z]);
+            }
+
+            if line.starts_with("f") {
+                let parts: Vec<&str> = line[2..].split(" ").collect();
+                let x: usize = parts[0].parse().unwrap();
+                let y: usize = parts[1].parse().unwrap();
+                let z: usize = parts[2].parse().unwrap();
+                tris.push(Triangle { p: [vertices[x - 1], vertices[z - 1], vertices[y - 1]] });
+            }
+        }
+
+        Ok(Mesh {
+            tris
+        })
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 struct Matrix4x4 {
     // [row][col]
@@ -87,6 +127,7 @@ struct Rasterizer {
     elapsed: f32,
 
     mesh_cube: Mesh,
+    suzanne: Mesh,
     projection: Matrix4x4,
     camera: Vec3D,
 }
@@ -100,6 +141,7 @@ impl Rasterizer {
         let z_near = 0.1;
 
         Rasterizer {
+            suzanne: Mesh::load_from_file("./Suzanne.obj").unwrap(),
             width,
             height,
             elapsed: 0.0,
@@ -122,28 +164,28 @@ impl Rasterizer {
             mesh_cube: Mesh {
                 tris: vec![
                     // SOUTH
-                    Triangle { p: [Vec3D { x: 0.0, y: 0.0, z: 0.0 }, Vec3D { x: 0.0, y: 1.0, z: 0.0 },  Vec3D { x: 1.0, y: 1.0, z: 0.0 }] },
-                    Triangle { p: [Vec3D { x: 0.0, y: 0.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 0.0 },  Vec3D { x: 1.0, y: 0.0, z: 0.0 }] },
+                    Triangle { p: [Vec3D { x: 0.0, y: 0.0, z: 0.0 }, Vec3D { x: 0.0, y: 1.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 0.0 }] },
+                    Triangle { p: [Vec3D { x: 0.0, y: 0.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 0.0 }, Vec3D { x: 1.0, y: 0.0, z: 0.0 }] },
 
                     // EAST
-                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 0.0 },  Vec3D { x: 1.0, y: 1.0, z: 1.0 }] },
-                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 1.0 },  Vec3D { x: 1.0, y: 0.0, z: 1.0 }] },
+                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 1.0 }] },
+                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 1.0 }, Vec3D { x: 1.0, y: 0.0, z: 1.0 }] },
 
                     // NORTH
-                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 1.0 }, Vec3D { x: 1.0, y: 1.0, z: 1.0 },  Vec3D { x: 0.0, y: 1.0, z: 1.0 }] },
-                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 1.0, z: 1.0 },  Vec3D { x: 0.0, y: 0.0, z: 1.0 }] },
+                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 1.0 }, Vec3D { x: 1.0, y: 1.0, z: 1.0 }, Vec3D { x: 0.0, y: 1.0, z: 1.0 }] },
+                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 1.0, z: 1.0 }, Vec3D { x: 0.0, y: 0.0, z: 1.0 }] },
 
                     // WEST
-                    Triangle { p: [Vec3D { x: 0.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 1.0, z: 1.0 },  Vec3D { x: 0.0, y: 1.0, z: 0.0 }] },
-                    Triangle { p: [Vec3D { x: 0.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 1.0, z: 0.0 },  Vec3D { x: 0.0, y: 0.0, z: 0.0 }] },
+                    Triangle { p: [Vec3D { x: 0.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 1.0, z: 1.0 }, Vec3D { x: 0.0, y: 1.0, z: 0.0 }] },
+                    Triangle { p: [Vec3D { x: 0.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 1.0, z: 0.0 }, Vec3D { x: 0.0, y: 0.0, z: 0.0 }] },
 
                     // TOP
-                    Triangle { p: [Vec3D { x: 0.0, y: 1.0, z: 0.0 }, Vec3D { x: 0.0, y: 1.0, z: 1.0 },  Vec3D { x: 1.0, y: 1.0, z: 1.0 }] },
-                    Triangle { p: [Vec3D { x: 0.0, y: 1.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 1.0 },  Vec3D { x: 1.0, y: 1.0, z: 0.0 }] },
+                    Triangle { p: [Vec3D { x: 0.0, y: 1.0, z: 0.0 }, Vec3D { x: 0.0, y: 1.0, z: 1.0 }, Vec3D { x: 1.0, y: 1.0, z: 1.0 }] },
+                    Triangle { p: [Vec3D { x: 0.0, y: 1.0, z: 0.0 }, Vec3D { x: 1.0, y: 1.0, z: 1.0 }, Vec3D { x: 1.0, y: 1.0, z: 0.0 }] },
 
                     // BOTTOM
-                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 0.0, z: 1.0 },  Vec3D { x: 0.0, y: 0.0, z: 0.0 }] },
-                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 0.0, z: 0.0 },  Vec3D { x: 1.0, y: 0.0, z: 0.0 }] },
+                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 0.0, z: 0.0 }] },
+                    Triangle { p: [Vec3D { x: 1.0, y: 0.0, z: 1.0 }, Vec3D { x: 0.0, y: 0.0, z: 0.0 }, Vec3D { x: 1.0, y: 0.0, z: 0.0 }] },
                 ]
             },
             camera: Vec3D {
@@ -185,6 +227,13 @@ impl Rasterizer {
     }
 }
 
+struct TriangleToDraw {
+    v1: Vec3D,
+    v2: Vec3D,
+    v3: Vec3D,
+    color: RGBA,
+}
+
 impl VNERunner for Rasterizer {
     fn tick(&mut self, delta_nano: u128, renderer: &mut impl VNERenderer) {
         self.update_fps(delta_nano, renderer);
@@ -196,7 +245,7 @@ impl VNERunner for Rasterizer {
         let theta = 1.0 * self.elapsed;
 
         #[rustfmt::skip]
-        let rot_z = Matrix4x4 {
+            let rot_z = Matrix4x4 {
             m: [[
                 theta.cos(), theta.sin(), 0.0, 0.0,
             ], [
@@ -209,21 +258,23 @@ impl VNERunner for Rasterizer {
         };
 
         #[rustfmt::skip]
-        let rot_x = Matrix4x4 {
+            let rot_x = Matrix4x4 {
             m: [[
                 1.0, 0.0, 0.0, 0.0,
             ], [
-                0.0, (theta*0.5).cos(), (theta*0.5).sin(), 0.0,
+                0.0, (theta * 0.5).cos(), (theta * 0.5).sin(), 0.0,
             ], [
-                0.0, -(theta*0.5).sin(), (theta*0.5).cos(), 0.0,
+                0.0, -(theta * 0.5).sin(), (theta * 0.5).cos(), 0.0,
             ], [
                 0.0, 0.0, 0.0, 1.0,
             ]]
         };
 
+        let mut to_draw: Vec<TriangleToDraw> = Vec::new();
+
         // Draw Triangles
         // screen space normalized left/right x=-1 / 1; bottom/top y=-1 / 1; front/back z=-1 / 1
-        for tri in self.mesh_cube.tris.iter() {
+        for tri in self.suzanne.tris.iter() {
             let mut tri_rotated_z = tri.clone();
             tri_rotated_z.p[0] = Rasterizer::multiply_vector_matrix(&tri.p[0], &rot_z);
             tri_rotated_z.p[1] = Rasterizer::multiply_vector_matrix(&tri.p[1], &rot_z);
@@ -254,6 +305,12 @@ impl VNERunner for Rasterizer {
                 let mut v3 =
                     Rasterizer::multiply_vector_matrix(&tri_translated.p[2], &self.projection);
 
+                let mut light_direction = vec3d![0.25, 0.25, -1.0];
+                light_direction.normalize();
+
+                let lum = normal.dot_product(&light_direction);
+                let color = RGBA { r: lum, g: lum, b: lum, a: 1.0 };
+
                 v1.x += 1.0;
                 v1.y += 1.0;
 
@@ -272,40 +329,71 @@ impl VNERunner for Rasterizer {
                 v3.x *= 0.5 * self.width as f32;
                 v3.y *= 0.5 * self.height as f32;
 
-                renderer.draw_line(
-                    Position {
-                        x: v1.x as u32,
-                        y: v1.y as u32,
-                    },
-                    Position {
-                        x: v2.x as u32,
-                        y: v2.y as u32,
-                    },
-                    WHITE,
-                );
-                renderer.draw_line(
-                    Position {
-                        x: v2.x as u32,
-                        y: v2.y as u32,
-                    },
-                    Position {
-                        x: v3.x as u32,
-                        y: v3.y as u32,
-                    },
-                    WHITE,
-                );
-                renderer.draw_line(
-                    Position {
-                        x: v3.x as u32,
-                        y: v3.y as u32,
-                    },
-                    Position {
-                        x: v1.x as u32,
-                        y: v1.y as u32,
-                    },
-                    WHITE,
-                );
+                to_draw.push(TriangleToDraw {
+                    v1,
+                    v2,
+                    v3,
+                    color,
+                })
             }
+        }
+
+        to_draw.sort_by(|a, b| {
+            let z1 = (a.v1.z + a.v2.z + a.v3.z / 3.0);
+            let z2 = (b.v1.z + b.v2.z + b.v3.z / 3.0);
+
+            z1.partial_cmp(&z2).unwrap()
+        });
+
+        for tris in to_draw.iter() {
+            renderer.fill_triangle(
+                PixelPosition {
+                    x: tris.v1.x.round() as u32,
+                    y: tris.v1.y.round() as u32,
+                },
+                PixelPosition {
+                    x: tris.v2.x.round() as u32,
+                    y: tris.v2.y.round() as u32,
+                },
+                PixelPosition {
+                    x: tris.v3.x.round() as u32,
+                    y: tris.v3.y.round() as u32,
+                },
+                tris.color
+            );
+            renderer.draw_line(
+                PixelPosition {
+                    x: tris.v1.x.round() as u32,
+                    y: tris.v1.y.round() as u32,
+                },
+                PixelPosition {
+                    x: tris.v2.x.round() as u32,
+                    y: tris.v2.y.round() as u32,
+                },
+                tris.color
+            );
+            renderer.draw_line(
+                PixelPosition {
+                    x: tris.v2.x.round() as u32,
+                    y: tris.v2.y.round() as u32,
+                },
+                PixelPosition {
+                    x: tris.v3.x.round() as u32,
+                    y: tris.v3.y.round() as u32,
+                },
+                tris.color
+            );
+            renderer.draw_line(
+                PixelPosition {
+                    x: tris.v3.x.round() as u32,
+                    y: tris.v3.y.round() as u32,
+                },
+                PixelPosition {
+                    x: tris.v1.x.round() as u32,
+                    y: tris.v1.y.round() as u32,
+                },
+                tris.color
+            );
         }
     }
 }
