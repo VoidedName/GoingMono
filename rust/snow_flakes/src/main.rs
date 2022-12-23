@@ -20,13 +20,13 @@ struct Runner {
 }
 
 impl Runner {
-    fn new(size: u32, settings: Vec<SimulationSetting>) -> Runner {
+    fn new(size: u32, settings: Vec<SimulationSetting>, cluster: bool) -> Runner {
         Runner {
             rand: rand::thread_rng(),
-            snow_flake: SnowFlake::new(size, settings[0].beta),
+            snow_flake: SnowFlake::new(size, settings[0].beta, cluster),
             time_since_last_update: 0,
             iterations: 0,
-            max_iterations: 10_000_000,
+            max_iterations: settings.iter().fold(0, |a, b| a + b.iterations),
             stop: false,
             settings,
         }
@@ -274,12 +274,16 @@ impl SnowFlake {
 }
 
 impl SnowFlake {
-    pub fn new(resolution: u32, background: f64) -> SnowFlake {
-        let mut rng: Pcg64 = Seeder::from("2022").make_rng();
-        let seeds = rng.gen_range(1..8);
+    pub fn new(resolution: u32, background: f64, cluster: bool) -> SnowFlake {
+        let mut rng: Pcg64 = Seeder::from("2023").make_rng();
+        let seeds = rng.gen_range(2..4);
         let mut seed_locations = Vec::new();
-        for seed in 0..seeds {
-            seed_locations.push((rng.gen_range(resolution-5..resolution+5), rng.gen_range(resolution-5..resolution+5)));
+        if cluster {
+            for seed in 0..seeds {
+                seed_locations.push((rng.gen_range(resolution - 5..resolution + 5), rng.gen_range(resolution - 5..resolution + 5)));
+            }
+        } else {
+            seed_locations.push((resolution, resolution));
         }
 
         SnowFlake {
@@ -389,47 +393,56 @@ impl VNERunner for Runner {
     fn tick(&mut self, nano_delta: u128, renderer: &mut impl VNERenderer) {
         self.time_since_last_update += nano_delta;
 
-        let mut settings = &self.settings[0];
         let mut iterations = self.iterations;
+        let mut setting_nr = 0;
         for setting in self.settings.iter() {
-            while iterations >= setting.iterations {
+            if iterations >= setting.iterations {
                 iterations -= setting.iterations;
-                settings = setting;
+                setting_nr += 1;
+            } else {
+                break;
             }
         }
 
-        let alpha = settings.alpha;
-        let beta = settings.beta;
-        let gamma = settings.gamma;
+        if setting_nr >= self.settings.len() {
+            self.stop = true;
+        }
 
-        if self.time_since_last_update >= 1 {
-            self.time_since_last_update = 0;
+        self.time_since_last_update = 0;
+
+        if self.iterations < self.max_iterations && !self.stop {
+
+            let mut settings = &self.settings[setting_nr];
+            let alpha = settings.alpha;
+            let beta = settings.beta;
+            let gamma = settings.gamma;
 
             let fallback = EDGE { moisture: beta };
 
-            if self.iterations < self.max_iterations && !self.stop {
-                self.iterations += 1;
-                self.snow_flake.simulate_step(|data, grid, neighbors| {
-                    let a = *neighbors.left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let b = *neighbors.top_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let c = *neighbors.top_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let f = *neighbors.right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let d = *neighbors.bottom_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let e = *neighbors.bottom_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+            self.iterations += 1;
+            if self.iterations % 10 == 0 {
+                renderer.set_title(format!("Flaky SnowFlake Generator! Setting: {}; Iteration: {};", setting_nr, self.iterations).as_str());
+            }
+            self.snow_flake.simulate_step(|data, grid, neighbors| {
+                let a = *neighbors.left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                let b = *neighbors.top_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                let c = *neighbors.top_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                let f = *neighbors.right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                let d = *neighbors.bottom_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                let e = *neighbors.bottom_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
 
-                    let nn = [a, b, c, d, e, f];
+                let nn = [a, b, c, d, e, f];
 
-                    if let FROZEN { .. } = data {
-                        for n in nn {
-                            if let EDGE { .. } = n {
-                                self.stop = true;
-                            }
+                if let FROZEN { .. } = data {
+                    for n in nn {
+                        if let EDGE { .. } = n {
+                            self.stop = true;
                         }
                     }
+                }
 
-                    data.updated(&nn, alpha, beta, gamma)
-                });
-            }
+                data.updated(&nn, alpha, beta, gamma)
+            });
         }
 
         // renderer.clear_screen(BLACK);
@@ -439,11 +452,11 @@ impl VNERunner for Runner {
                 if let Some(state) = self.snow_flake.grid.get(x, y) {
                     match state {
                         BOUNDARY { moisture } | EDGE { moisture } | NOT_RECEPTIVE { moisture } => {
-                            let intensity = (*moisture as f32 * 0.2).min(0.2);
+                            let intensity = (*moisture as f32 * 0.25).min(0.25);
                             self.fill_hex((x, y), 2.0, RGBA { r: 0.51 * intensity, g: intensity * 0.8, b: intensity, a: 1.0 }, renderer);
                         }
                         FROZEN { moisture } => {
-                            let intensity = 1.0 / *moisture as f32;
+                            let intensity = 1.0 / (*moisture as f32).log2();
                             self.fill_hex((x, y), 2.0, RGBA { r: intensity, g: intensity, b: intensity, a: 1.0 }, renderer);
                         }
                     }
@@ -454,18 +467,17 @@ impl VNERunner for Runner {
 }
 
 fn main() {
-    let alpha = 0.5;
-    let beta = 0.2;
-    let gamma = 0.05;
     let settings = vec![
-        SimulationSetting { alpha: 2.69, beta: 0.3, gamma: 0.002, iterations: 10 },
-        SimulationSetting { alpha: 1.0, beta: 0.4, gamma: 0.01, iterations: 10 },
-        SimulationSetting { alpha: 2.03, beta: 0.3, gamma: 0.002, iterations: 1 },
+        // SimulationSetting { alpha: 1.0, beta: 0.4, gamma: 0.5, iterations: 5 },
+        // SimulationSetting { alpha: 2.0, beta: 0.4, gamma: 0.001, iterations: 2000 },
 
-        // SimulationSetting { alpha: 2.003, beta: 0.9, gamma: 0.0001, iterations: 1000 },
-        // SimulationSetting { alpha: 2.003, beta: 0.03, gamma: 0.00005, iterations: 1000 },
+        // SimulationSetting { alpha: 1.0, beta: 0.35, gamma: 0.0001, iterations: 2000 },
+        // SimulationSetting { alpha: 1.0, beta: 0.9, gamma: 0.8, iterations: 20 },
+
+        SimulationSetting { alpha: 2.0, beta: 0.5, gamma: 0.0001, iterations: 250 },
+        SimulationSetting { alpha: 0.5, beta: 0.3, gamma: 0.0001, iterations: 1000 },
     ];
     let mut engine = vn_engine::engine::VNEngine::new_opengl(775 * 2, 680 * 2, 1);
-    let mut runner = Runner::new(28 * 8, settings);
+    let mut runner = Runner::new(28 * 8, settings, false);
     engine.run(&mut runner);
 }
