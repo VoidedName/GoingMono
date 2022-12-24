@@ -1,5 +1,7 @@
 use std::f64::consts::PI;
 use std::mem::swap;
+use std::ops::Index;
+use std::process::Output;
 use rand::Rng;
 use rand::rngs::ThreadRng;
 use rand_pcg::Pcg64;
@@ -7,11 +9,19 @@ use rand_seeder::Seeder;
 use vn_engine::color::{BLACK, BLUE, GREEN, RED, RGBA, WHITE, YELLOW};
 use vn_engine::engine::VNERunner;
 use vn_engine::render::{PixelPosition, VNERenderer};
+use crate::BufferUse::{FIRST, SECOND};
 use crate::SnowFlakeGridData::{BOUNDARY, EDGE, FROZEN, NOT_RECEPTIVE};
+
+enum BufferUse {
+    FIRST,
+    SECOND,
+}
 
 struct Runner {
     rand: ThreadRng,
-    snow_flake: SnowFlake,
+    snow_flake_buffer1: SnowFlake,
+    snow_flake_buffer2: SnowFlake,
+    buffer_in_use: BufferUse,
     time_since_last_update: u128,
     iterations: u32,
     max_iterations: u32,
@@ -21,14 +31,47 @@ struct Runner {
 
 impl Runner {
     fn new(size: u32, settings: Vec<SimulationSetting>, cluster: bool) -> Runner {
+        let buffer1 = SnowFlake::new(size, settings[0].beta, cluster);
+        let buffer2 = SnowFlake::new(size, settings[0].beta, cluster);
         Runner {
             rand: rand::thread_rng(),
-            snow_flake: SnowFlake::new(size, settings[0].beta, cluster),
+            snow_flake_buffer1: buffer1,
+            snow_flake_buffer2: buffer2,
+            buffer_in_use: FIRST,
             time_since_last_update: 0,
             iterations: 0,
             max_iterations: settings.iter().fold(0, |a, b| a + b.iterations),
             stop: false,
             settings,
+        }
+    }
+
+    /// (current, buffer)
+    pub fn snowflake_data(&mut self) -> (&SnowFlake, &mut SnowFlake) {
+        match &self.buffer_in_use {
+            FIRST => (&self.snow_flake_buffer1, &mut self.snow_flake_buffer2),
+            SECOND => (&self.snow_flake_buffer2, &mut self.snow_flake_buffer1),
+        }
+    }
+
+    fn snowflake(&mut self) -> &SnowFlake {
+        match &self.buffer_in_use {
+            FIRST => &self.snow_flake_buffer1,
+            SECOND => &self.snow_flake_buffer2,
+        }
+    }
+
+    fn snowflake_buffer(&mut self) -> &mut SnowFlake {
+        match &self.buffer_in_use {
+            FIRST => &mut self.snow_flake_buffer2,
+            SECOND => &mut self.snow_flake_buffer1,
+        }
+    }
+
+    pub fn swap_buffers(&mut self) {
+        match &self.buffer_in_use {
+            FIRST => self.buffer_in_use = SECOND,
+            SECOND => self.buffer_in_use = FIRST,
         }
     }
 }
@@ -61,7 +104,7 @@ struct HexGrid<CellData> {
 }
 
 impl<T> HexGrid<T> {
-    pub fn new<D, F>(cols: u32, rows: u32, init: F) -> HexGrid<D> where F: Fn(u32, u32) -> D {
+    pub fn new<F>(cols: u32, rows: u32, init: F) -> HexGrid<T> where F: Fn(u32, u32) -> T {
         let mut cells = Vec::with_capacity(rows as usize * cols as usize);
         for y in 0..rows {
             for x in 0..cols {
@@ -79,25 +122,13 @@ impl<T> HexGrid<T> {
         ((row * self.cols) + col) as usize
     }
 
-    pub fn get(&self, col: u32, row: u32) -> Option<&T> {
-        if row >= self.rows || col >= self.cols { return None; }
-        let idx = self.idx(col, row);
-        Some(&self.cells[idx])
-    }
-
-    pub fn set(&mut self, col: u32, row: u32, data: T) {
-        if row >= self.rows || col >= self.cols { return; }
-        let idx = self.idx(col, row);
-        self.cells[idx] = data;
-    }
-
     pub fn hex_space(x: u32, y: u32) -> (i32, i32) {
         (x as i32 - (y / 2) as i32, x as i32 + ((y as i32 + 1) / 2))
     }
 
     pub fn distance(p1: (u32, u32), p2: (u32, u32)) -> u32 {
-        let (x1, y1) = HexGrid::<T>::hex_space(p1.0, p1.1);
-        let (x2, y2) = HexGrid::<T>::hex_space(p2.0, p2.1);
+        let (x1, y1) = HexGrid::<SnowFlakeGridData>::hex_space(p1.0, p1.1);
+        let (x2, y2) = HexGrid::<SnowFlakeGridData>::hex_space(p2.0, p2.1);
         let dx = x2 - x1;
         let dy = y2 - y1;
         if dx.signum() == dy.signum() {
@@ -164,7 +195,20 @@ impl<T> HexGrid<T> {
     }
 }
 
-// https://www.patarnott.com/pdf/SnowCrystalGrowth.pdf
+impl<T> HexGrid<T> {
+    pub fn get(&self, col: u32, row: u32) -> Option<&T> {
+        if row >= self.rows || col >= self.cols { return None; }
+        let idx = self.idx(col, row);
+        Some(&self.cells[idx])
+    }
+
+    pub fn set(&mut self, col: u32, row: u32, data: T) {
+        if row >= self.rows || col >= self.cols { return; }
+        let idx = self.idx(col, row);
+        self.cells[idx] = data;
+    }
+}
+
 // moisture > 0.0 is considered frozen
 // BOUNDARY and FROZEN are receptive cells
 // BORDER and NOT_RECEPTIVE are not receptive cells
@@ -257,19 +301,17 @@ struct SnowFlake {
 }
 
 impl SnowFlake {
-    pub fn simulate_step<F>(&mut self, mut rules: F)
+    pub fn simulate_step<F>(&self, target: &mut SnowFlake, mut rules: F)
         where F: FnMut(&SnowFlakeGridData, &HexGrid<SnowFlakeGridData>, &HexNeighbors) -> SnowFlakeGridData
     {
-        let mut new_grid_data: Vec<SnowFlakeGridData> = Vec::new();
         for y in 0..self.grid.rows {
             for x in 0..self.grid.cols {
                 if let Some(state) = self.grid.get(x, y) {
                     let new_data = rules(state, &self.grid, &self.grid.neighbors(x, y));
-                    new_grid_data.push(new_data)
+                    target.grid.set(x, y, new_data);
                 }
             }
         }
-        self.grid.cells = new_grid_data;
     }
 }
 
@@ -410,8 +452,8 @@ impl VNERunner for Runner {
 
         self.time_since_last_update = 0;
 
+        let mut stop = self.stop.clone();
         if self.iterations < self.max_iterations && !self.stop {
-
             let mut settings = &self.settings[setting_nr];
             let alpha = settings.alpha;
             let beta = settings.beta;
@@ -423,41 +465,48 @@ impl VNERunner for Runner {
             if self.iterations % 10 == 0 {
                 renderer.set_title(format!("Flaky SnowFlake Generator! Setting: {}; Iteration: {};", setting_nr, self.iterations).as_str());
             }
-            self.snow_flake.simulate_step(|data, grid, neighbors| {
-                let a = *neighbors.left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                let b = *neighbors.top_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                let c = *neighbors.top_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                let f = *neighbors.right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                let d = *neighbors.bottom_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                let e = *neighbors.bottom_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+            let (snowflake, buffer) = self.snowflake_data();
+            {
+                snowflake.simulate_step(buffer, |data, grid, neighbors| {
+                    let a = *neighbors.left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                    let b = *neighbors.top_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                    let c = *neighbors.top_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                    let f = *neighbors.right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                    let d = *neighbors.bottom_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                    let e = *neighbors.bottom_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
 
-                let nn = [a, b, c, d, e, f];
+                    let nn = [a, b, c, d, e, f];
 
-                if let FROZEN { .. } = data {
-                    for n in nn {
-                        if let EDGE { .. } = n {
-                            self.stop = true;
+                    if let FROZEN { .. } = data {
+                        for n in nn {
+                            if let EDGE { .. } = n {
+                                stop = true;
+                            }
                         }
                     }
-                }
 
-                data.updated(&nn, alpha, beta, gamma)
-            });
+                    data.updated(&nn, alpha, beta, gamma)
+                });
+            }
+            self.stop = stop;
+            self.swap_buffers();
         }
 
-        // renderer.clear_screen(BLACK);
+        renderer.clear_screen(BLACK);
 
-        for y in 0..self.snow_flake.resolution * 2 + 1 {
-            for x in 0..self.snow_flake.resolution * 2 + 1 {
-                if let Some(state) = self.snow_flake.grid.get(x, y) {
+        for y in 0..self.snowflake().resolution * 2 + 1 {
+            for x in 0..self.snowflake().resolution * 2 + 1 {
+                if let Some(state) = self.snowflake().grid.get(x, y) {
                     match state {
                         BOUNDARY { moisture } | EDGE { moisture } | NOT_RECEPTIVE { moisture } => {
-                            let intensity = (*moisture as f32 * 0.25).min(0.25);
-                            self.fill_hex((x, y), 2.0, RGBA { r: 0.51 * intensity, g: intensity * 0.8, b: intensity, a: 1.0 }, renderer);
+                            if !stop {
+                                let intensity = (*moisture as f32 * 0.25).min(0.25);
+                                self.fill_hex((x, y), 4.0, RGBA { r: 0.51 * intensity, g: intensity * 0.8, b: intensity, a: 1.0 }, renderer);
+                            }
                         }
                         FROZEN { moisture } => {
-                            let intensity = 1.0 / (*moisture as f32).log2();
-                            self.fill_hex((x, y), 2.0, RGBA { r: intensity, g: intensity, b: intensity, a: 1.0 }, renderer);
+                            let intensity = 1.0 / (*moisture as f32);
+                            self.fill_hex((x, y), 4.0, RGBA { r: intensity, g: intensity, b: intensity, a: 1.0 }, renderer);
                         }
                     }
                 }
@@ -466,18 +515,29 @@ impl VNERunner for Runner {
     }
 }
 
+
+/// Simulation is controlled by the settings.
+/// It stops when either the snowflake reaches the edge or the last setting ran out of iterations.
+///
+/// Simulation is based on a cellular automaton.
+///  - cells are hexagons
+///  - a cell freezes once its water content reaches 1
+///  - a cell either diffuses water or absorbs water.
+///  - frozen cells or those adjacent to frozen ones absorb water.
+///  - all other cells diffuse water
+///
+/// alpha: controls diffusion across the plane (i.e. how fast the water travels between cells)
+/// beta: controls how fast water is injected from the border
+/// gamma: constant background vapour
+/// main reference i used https://www.patarnott.com/pdf/SnowCrystalGrowth.pdf
 fn main() {
     let settings = vec![
-        // SimulationSetting { alpha: 1.0, beta: 0.4, gamma: 0.5, iterations: 5 },
-        // SimulationSetting { alpha: 2.0, beta: 0.4, gamma: 0.001, iterations: 2000 },
-
-        // SimulationSetting { alpha: 1.0, beta: 0.35, gamma: 0.0001, iterations: 2000 },
-        // SimulationSetting { alpha: 1.0, beta: 0.9, gamma: 0.8, iterations: 20 },
-
         SimulationSetting { alpha: 2.0, beta: 0.5, gamma: 0.0001, iterations: 250 },
-        SimulationSetting { alpha: 0.5, beta: 0.3, gamma: 0.0001, iterations: 1000 },
+        SimulationSetting { alpha: 1.0, beta: 0.1, gamma: 0.1, iterations: 30 },
+        SimulationSetting { alpha: 1.0, beta: 0.8, gamma: 0.01, iterations: 70 },
+        SimulationSetting { alpha: 1.0, beta: 0.3, gamma: 0.000001, iterations: 300 },
     ];
-    let mut engine = vn_engine::engine::VNEngine::new_opengl(775 * 2, 680 * 2, 1);
-    let mut runner = Runner::new(28 * 8, settings, false);
+    let mut engine = vn_engine::engine::VNEngine::new_opengl(1160, 1000, 2);
+    let mut runner = Runner::new(28 * 3, settings, false);
     engine.run(&mut runner);
 }
