@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 use std::{fs, ops};
 use std::process::Output;
 use vn_engine::color::{BLACK, RGBA, VIOLET, WHITE};
-use vn_engine::engine::{VNERunner, VNEngine};
+use vn_engine::engine::{VNERunner, VNEngine, EngineState};
 use vn_engine::opengl::OpenGLRenderer;
 use vn_engine::render::{PixelPosition, VNERenderer};
 
@@ -121,7 +121,7 @@ struct Rasterizer {
     width: u32,
     height: u32,
     rng: ThreadRng,
-    time_since_last_fps_draw: u128,
+    time_since_last_fps_draw: f64,
     frames_since_last_fps_draw: u128,
 
     elapsed: f32,
@@ -146,7 +146,7 @@ impl Rasterizer {
             height,
             elapsed: 0.0,
             rng: rand::thread_rng(),
-            time_since_last_fps_draw: 0,
+            time_since_last_fps_draw: 0.0,
             frames_since_last_fps_draw: 0,
             #[rustfmt::skip]
             projection: Matrix4x4 {
@@ -196,13 +196,12 @@ impl Rasterizer {
         }
     }
 
-    fn update_fps(&mut self, delta_nano: u128, renderer: &mut impl VNERenderer) {
-        self.time_since_last_fps_draw += delta_nano;
+    fn update_fps(&mut self, engine: &EngineState, renderer: &mut impl VNERenderer) {
+        self.time_since_last_fps_draw += engine.delta;
         self.frames_since_last_fps_draw += 1;
-        if self.time_since_last_fps_draw > 200_000_000 {
-            let fps =
-                (self.frames_since_last_fps_draw * 1_000_000_000) / self.time_since_last_fps_draw;
-            self.time_since_last_fps_draw = 0;
+        if self.time_since_last_fps_draw > 0.2 {
+            let fps = 1.0 / self.time_since_last_fps_draw;
+            self.time_since_last_fps_draw = 0.0;
             self.frames_since_last_fps_draw = 0;
             renderer.set_title(format!("Test - FPS: {}", fps).as_str());
         }
@@ -235,10 +234,10 @@ struct TriangleToDraw {
 }
 
 impl VNERunner for Rasterizer {
-    fn tick(&mut self, delta_nano: u128, renderer: &mut impl VNERenderer) {
-        self.update_fps(delta_nano, renderer);
+    fn tick(&mut self, engine: &EngineState, renderer: &mut impl VNERenderer) {
+        self.update_fps(engine, renderer);
 
-        self.elapsed += delta_nano as f32 / 1_000_000_000 as f32;
+        self.elapsed += engine.delta as f32;
 
         renderer.clear_screen(BLACK);
 

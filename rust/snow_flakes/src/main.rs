@@ -7,7 +7,7 @@ use rand::rngs::ThreadRng;
 use rand_pcg::Pcg64;
 use rand_seeder::Seeder;
 use vn_engine::color::{BLACK, BLUE, GREEN, RED, RGBA, WHITE, YELLOW};
-use vn_engine::engine::VNERunner;
+use vn_engine::engine::{EngineState, VNERunner};
 use vn_engine::render::{PixelPosition, VNERenderer};
 use crate::BufferUse::{FIRST, SECOND};
 use crate::SnowFlakeGridData::{BOUNDARY, EDGE, FROZEN, NOT_RECEPTIVE};
@@ -22,7 +22,6 @@ struct Runner {
     snow_flake_buffer1: SnowFlake,
     snow_flake_buffer2: SnowFlake,
     buffer_in_use: BufferUse,
-    time_since_last_update: u128,
     iterations: u32,
     max_iterations: u32,
     stop: bool,
@@ -38,7 +37,6 @@ impl Runner {
             snow_flake_buffer1: buffer1,
             snow_flake_buffer2: buffer2,
             buffer_in_use: FIRST,
-            time_since_last_update: 0,
             iterations: 0,
             max_iterations: settings.iter().fold(0, |a, b| a + b.iterations),
             stop: false,
@@ -428,13 +426,11 @@ impl Runner {
 }
 
 impl VNERunner for Runner {
-    fn setup(&mut self, renderer: &mut impl VNERenderer) {
+    fn setup(&mut self, _engine: &EngineState, renderer: &mut impl VNERenderer) {
         renderer.set_title("Flaky SnowFlake Generator!");
     }
 
-    fn tick(&mut self, nano_delta: u128, renderer: &mut impl VNERenderer) {
-        self.time_since_last_update += nano_delta;
-
+    fn tick(&mut self, _engine: &EngineState, renderer: &mut impl VNERenderer) {
         let mut iterations = self.iterations;
         let mut setting_nr = 0;
         for setting in self.settings.iter() {
@@ -449,8 +445,6 @@ impl VNERunner for Runner {
         if setting_nr >= self.settings.len() {
             self.stop = true;
         }
-
-        self.time_since_last_update = 0;
 
         let mut stop = self.stop.clone();
         if self.iterations < self.max_iterations && !self.stop {
@@ -537,7 +531,7 @@ fn main() {
         SimulationSetting { alpha: 1.0, beta: 0.8, gamma: 0.01, iterations: 70 },
         SimulationSetting { alpha: 1.0, beta: 0.3, gamma: 0.000001, iterations: 300 },
     ];
-    let mut engine = vn_engine::engine::VNEngine::new_opengl(1160, 1000, 2);
+    let mut engine = vn_engine::engine::VNEngine::new_opengl(1165, 1000, 2);
     let mut runner = Runner::new(28 * 3, settings, false);
     engine.run(&mut runner);
 }
