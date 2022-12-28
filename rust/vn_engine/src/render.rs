@@ -94,6 +94,11 @@ fn fill_flat_top<T: VNERenderer + ?Sized>(
     }
 }
 
+/// test if point point is to the right of vector v1 -> v2
+fn edge_function(v1: PixelPosition, v2: PixelPosition, point: PixelPosition) -> bool {
+    (point.x as i32 - v1.x as i32) * (v2.y as i32 - v1.y as i32) - (point.y as i32 - v1.y as i32) * (v2.x as i32 - v1.x as i32) >= 0
+}
+
 pub trait VNERenderer {
     fn set_title(&mut self, title: &str);
     fn clear_screen(&mut self, color: RGBA);
@@ -128,49 +133,33 @@ pub trait VNERenderer {
             );
         }
     }
+
+
+    /// assumes clockwise vertex order
     fn fill_triangle(
         &mut self,
         v1: PixelPosition,
         v2: PixelPosition,
         v3: PixelPosition,
+        clamp_top_left: PixelPosition,
+        clamp_bottom_right: PixelPosition,
         color: RGBA,
     ) {
-        let mut sorted = vec![v1, v2, v3];
-        sorted.sort_by(|a, b| {
-            let cmp = a.y.partial_cmp(&b.y).unwrap();
-            if cmp.is_eq() {
-                a.x.partial_cmp(&b.x).unwrap()
-            } else {
-                cmp
+        let x_min = v1.x.min(v2.x).min(v3.x).max(clamp_top_left.x);
+        let x_max = v1.x.max(v2.x).max(v3.x).min(clamp_bottom_right.x);
+        let y_min = v1.y.min(v2.y).min(v3.y).max(clamp_top_left.y);
+        let y_max = v1.y.max(v2.y).max(v3.y).min(clamp_bottom_right.y);
+
+        for y in y_min..=y_max {
+            for x in x_min..=x_max {
+                let point = PixelPosition{ x, y };
+                let mut inside = edge_function(v1, v2, point);
+                inside &= edge_function(v2, v3, point);
+                inside &= edge_function(v3, v1, point);
+                if inside {
+                    self.draw_pixel(point, color);
+                }
             }
-        });
-        let v1 = sorted[0];
-        let v2 = sorted[1];
-        let v3 = sorted[2];
-
-        if v2.y == v3.y {
-            fill_flat_bottom(self, v1, v2, v3, color);
-            return;
-        }
-        if v1.y == v2.y {
-            fill_flat_top(self, v1, v2, v3, color);
-            return;
-        }
-
-        let long = v3.y - v1.y;
-        let short = v3.y - v2.y;
-        let weight = short as f64 / long as f64;
-        let v4 = PixelPosition {
-            x: (lerp(v3.x as f64, v1.x as f64, weight) + 0.5) as u32,
-            y: v2.y,
-        };
-
-        if v2.x < v4.x {
-            fill_flat_bottom(self, v1, v2, v4, color);
-            fill_flat_top(self, v2, v4, v3, color);
-        } else {
-            fill_flat_bottom(self, v1, v4, v2, color);
-            fill_flat_top(self, v4, v2, v3, color);
         }
     }
 }

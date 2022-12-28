@@ -128,7 +128,6 @@ impl<T: VNEFullRenderer> VNEngine<T> {
                     window_id,
                 } => {
                     self.engine_state.focused = in_focus;
-                    println!("in focus: {}", in_focus);
                 }
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,

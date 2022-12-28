@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 use std::{fs, ops};
 use std::process::Output;
 use vn_engine::color::{BLACK, RGBA, VIOLET, WHITE};
-use vn_engine::engine::{VNERunner, VNEngine, EngineState};
+use vn_engine::engine::{VNERunner, VNEngine, VNEngineState};
 use vn_engine::opengl::OpenGLRenderer;
 use vn_engine::render::{PixelPosition, VNERenderer};
 
@@ -196,11 +196,11 @@ impl Rasterizer {
         }
     }
 
-    fn update_fps(&mut self, engine: &EngineState, renderer: &mut impl VNERenderer) {
+    fn update_fps(&mut self, engine: &VNEngineState, renderer: &mut (impl VNERenderer + ?Sized)) {
         self.time_since_last_fps_draw += engine.delta;
         self.frames_since_last_fps_draw += 1;
         if self.time_since_last_fps_draw > 0.2 {
-            let fps = 1.0 / self.time_since_last_fps_draw;
+            let fps = (1.0 / self.time_since_last_fps_draw) * self.frames_since_last_fps_draw as f64;
             self.time_since_last_fps_draw = 0.0;
             self.frames_since_last_fps_draw = 0;
             renderer.set_title(format!("Test - FPS: {}", fps).as_str());
@@ -234,7 +234,7 @@ struct TriangleToDraw {
 }
 
 impl VNERunner for Rasterizer {
-    fn tick(&mut self, engine: &EngineState, renderer: &mut impl VNERenderer) {
+    fn tick(&mut self, engine: &VNEngineState, renderer: &mut (impl VNERenderer + ?Sized)) {
         self.update_fps(engine, renderer);
 
         self.elapsed += engine.delta as f32;
@@ -358,38 +358,13 @@ impl VNERunner for Rasterizer {
                     x: tris.v3.x.round() as u32,
                     y: tris.v3.y.round() as u32,
                 },
-                tris.color
-            );
-            renderer.draw_line(
                 PixelPosition {
-                    x: tris.v1.x.round() as u32,
-                    y: tris.v1.y.round() as u32,
+                    x: 0,
+                    y: 0,
                 },
                 PixelPosition {
-                    x: tris.v2.x.round() as u32,
-                    y: tris.v2.y.round() as u32,
-                },
-                tris.color
-            );
-            renderer.draw_line(
-                PixelPosition {
-                    x: tris.v2.x.round() as u32,
-                    y: tris.v2.y.round() as u32,
-                },
-                PixelPosition {
-                    x: tris.v3.x.round() as u32,
-                    y: tris.v3.y.round() as u32,
-                },
-                tris.color
-            );
-            renderer.draw_line(
-                PixelPosition {
-                    x: tris.v3.x.round() as u32,
-                    y: tris.v3.y.round() as u32,
-                },
-                PixelPosition {
-                    x: tris.v1.x.round() as u32,
-                    y: tris.v1.y.round() as u32,
+                    x: self.width,
+                    y: self.height,
                 },
                 tris.color
             );
@@ -399,7 +374,7 @@ impl VNERunner for Rasterizer {
 
 fn main() {
     let (width, height) = (256, 240);
-    let mut engine = VNEngine::new_opengl(width, height, 8);
+    let mut engine = VNEngine::new_sprite_based(width, height, 8);
     let mut runner = Rasterizer::new(width, height);
     engine.run(&mut runner)
 }

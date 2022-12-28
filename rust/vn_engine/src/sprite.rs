@@ -230,8 +230,6 @@ fn setup() {
         gl::BindBuffer(gl::ARRAY_BUFFER, vb_layer);
     };
 
-    println!("{}, {}", va_layer, vb_layer);
-
     unsafe {
         gl::VertexAttribPointer(
             0,
