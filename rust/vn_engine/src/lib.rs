@@ -7,3 +7,6 @@ pub mod color;
 pub mod engine;
 pub mod opengl;
 pub mod render;
+mod sprite;
+
+pub use device_query::{Keycode, MouseState};

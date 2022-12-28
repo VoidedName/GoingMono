@@ -1,7 +1,8 @@
+use crate::color::RGBA;
 use std::cmp::max;
 use std::ops;
 use winit::event::VirtualKeyCode::P;
-use crate::color::RGBA;
+use winit::window::Window;
 
 impl ops::Add for PixelPosition {
     type Output = PixelPosition;
@@ -30,7 +31,13 @@ fn lerp(a: f64, b: f64, w: f64) -> f64 {
 //     *p1
 //
 //*p2      *p3
-fn fill_flat_bottom<T: VNERenderer + ?Sized>(render: &mut T, p1: PixelPosition, p2: PixelPosition, p3: PixelPosition, color: RGBA) {
+fn fill_flat_bottom<T: VNERenderer + ?Sized>(
+    render: &mut T,
+    p1: PixelPosition,
+    p2: PixelPosition,
+    p3: PixelPosition,
+    color: RGBA,
+) {
     let dxy_left = (p1.x as f64 - p2.x as f64) / (p1.y as f64 - p2.y as f64);
     let dxy_right = (p1.x as f64 - p3.x as f64) / (p1.y as f64 - p3.y as f64);
 
@@ -38,18 +45,32 @@ fn fill_flat_bottom<T: VNERenderer + ?Sized>(render: &mut T, p1: PixelPosition, 
     let mut xr = p1.x as f64;
 
     for y in p1.y..p2.y {
-        render.draw_line(PixelPosition { x: xl.floor() as u32, y },
-                         PixelPosition { x: xr.ceil() as u32, y }, color);
+        render.draw_line(
+            PixelPosition {
+                x: xl.floor() as u32,
+                y,
+            },
+            PixelPosition {
+                x: xr.ceil() as u32,
+                y,
+            },
+            color,
+        );
         xl += dxy_left;
         xr += dxy_right;
     }
 }
 
-
 //*p1       *p2
 //
 //     *p3
-fn fill_flat_top<T: VNERenderer + ?Sized>(render: &mut T, p1: PixelPosition, p2: PixelPosition, p3: PixelPosition, color: RGBA) {
+fn fill_flat_top<T: VNERenderer + ?Sized>(
+    render: &mut T,
+    p1: PixelPosition,
+    p2: PixelPosition,
+    p3: PixelPosition,
+    color: RGBA,
+) {
     let dxy_left = (p1.x as f64 - p3.x as f64) / (p1.y as f64 - p3.y as f64);
     let dxy_right = (p2.x as f64 - p3.x as f64) / (p2.y as f64 - p3.y as f64);
 
@@ -57,8 +78,17 @@ fn fill_flat_top<T: VNERenderer + ?Sized>(render: &mut T, p1: PixelPosition, p2:
     let mut xr = p3.x as f64;
 
     for y in (p1.y..p3.y).rev() {
-        render.draw_line(PixelPosition { x: xl.floor() as u32, y },
-                         PixelPosition { x: xr.ceil() as u32, y }, color);
+        render.draw_line(
+            PixelPosition {
+                x: xl.floor() as u32,
+                y,
+            },
+            PixelPosition {
+                x: xr.ceil() as u32,
+                y,
+            },
+            color,
+        );
         xl -= dxy_left;
         xr -= dxy_right;
     }
@@ -79,14 +109,32 @@ pub trait VNERenderer {
 
         let mut x = from.x as f64;
         let mut y = from.y as f64;
-        self.draw_pixel(PixelPosition { x: x as u32, y: y as u32 }, color);
+        self.draw_pixel(
+            PixelPosition {
+                x: x as u32,
+                y: y as u32,
+            },
+            color,
+        );
         for _ in 0..steps as i32 {
             x += x_inc;
             y += y_inc;
-            self.draw_pixel(PixelPosition { x: x.round() as u32, y: y.round() as u32 }, color);
+            self.draw_pixel(
+                PixelPosition {
+                    x: x.round() as u32,
+                    y: y.round() as u32,
+                },
+                color,
+            );
         }
     }
-    fn fill_triangle(&mut self, v1: PixelPosition, v2: PixelPosition, v3: PixelPosition, color: RGBA) {
+    fn fill_triangle(
+        &mut self,
+        v1: PixelPosition,
+        v2: PixelPosition,
+        v3: PixelPosition,
+        color: RGBA,
+    ) {
         let mut sorted = vec![v1, v2, v3];
         sorted.sort_by(|a, b| {
             let cmp = a.y.partial_cmp(&b.y).unwrap();
@@ -131,6 +179,12 @@ pub trait VNERendererCommit {
     /// commit all drawing operations
     fn commit(&mut self);
 }
+
+pub trait VNERendererWindow {
+    fn window(&mut self) -> &Window;
+}
+
+pub trait VNEFullRenderer: VNERenderer + VNERendererWindow + VNERendererCommit {}
 
 #[derive(Copy, Clone, Debug)]
 pub struct PixelPosition {

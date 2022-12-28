@@ -13,7 +13,7 @@ use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
 
-use crate::render::{VNERenderer, VNERendererCommit};
+use crate::render::{VNEFullRenderer, VNERenderer, VNERendererCommit, VNERendererWindow};
 use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
 use glutin_winit::{self};
@@ -142,7 +142,7 @@ fn setup_buffers(width: u32, height: u32) -> Result<Vec<RGBA>, String> {
     Ok(colors)
 }
 
-fn create_shader(src: &str, kind: GLenum) -> Result<GLuint, String> {
+pub fn create_shader(src: &str, kind: GLenum) -> Result<GLuint, String> {
     unsafe {
         let shader_handler = gl::CreateShader(kind);
         if shader_handler == 0 {
@@ -175,7 +175,7 @@ fn create_shader(src: &str, kind: GLenum) -> Result<GLuint, String> {
     }
 }
 
-fn create_program(shaders: Vec<GLuint>) -> Result<GLuint, String> {
+pub fn create_program(shaders: Vec<GLuint>) -> Result<GLuint, String> {
     unsafe {
         let shader_program = gl::CreateProgram();
         if shader_program == 0 {
@@ -208,7 +208,7 @@ fn create_program(shaders: Vec<GLuint>) -> Result<GLuint, String> {
 pub struct OpenGLRenderer {
     width: u32,
     height: u32,
-    window: Window,
+    pub window: Window,
     surface: Surface<WindowSurface>,
     context: PossiblyCurrentContext,
     color_buffer: Vec<RGBA>,
@@ -259,8 +259,21 @@ impl OpenGLRenderer {
     }
 }
 
+impl VNERendererWindow for OpenGLRenderer {
+    fn window(&mut self) -> &Window {
+        &self.window
+    }
+}
+
+impl VNEFullRenderer for OpenGLRenderer {}
+
 impl OpenGLRenderer {
-    pub fn new(width: u32, height: u32, scale: u32, event_loop: &EventLoop<()>) -> OpenGLRenderer {
+    pub fn new<'a>(
+        width: u32,
+        height: u32,
+        scale: u32,
+        event_loop: &EventLoop<()>,
+    ) -> OpenGLRenderer {
         let window_builder = Some(WindowBuilder::new().with_resizable(false).with_inner_size(
             PhysicalSize {
                 width: width * scale,
@@ -320,8 +333,8 @@ impl OpenGLRenderer {
 
         let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
             raw_window_handle,
-            NonZeroU32::new(width*scale).unwrap(),
-            NonZeroU32::new(height*scale).unwrap(),
+            NonZeroU32::new(width * scale).unwrap(),
+            NonZeroU32::new(height * scale).unwrap(),
         );
 
         let surface = unsafe {
@@ -349,13 +362,15 @@ impl OpenGLRenderer {
             .set_swap_interval(&context, SwapInterval::DontWait)
             .expect("Failed to set vsync to off!");
 
-        OpenGLRenderer {
+        let opengl = OpenGLRenderer {
             width,
             height,
             window,
             surface,
             context,
             color_buffer,
-        }
+        };
+
+        opengl
     }
 }

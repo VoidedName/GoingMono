@@ -1,16 +1,16 @@
+use crate::BufferUse::{FIRST, SECOND};
+use crate::SnowFlakeGridData::{BOUNDARY, EDGE, FROZEN, NOT_RECEPTIVE};
+use rand::rngs::ThreadRng;
+use rand::Rng;
+use rand_pcg::Pcg64;
+use rand_seeder::Seeder;
 use std::f64::consts::PI;
 use std::mem::swap;
 use std::ops::Index;
 use std::process::Output;
-use rand::Rng;
-use rand::rngs::ThreadRng;
-use rand_pcg::Pcg64;
-use rand_seeder::Seeder;
 use vn_engine::color::{BLACK, BLUE, GREEN, RED, RGBA, WHITE, YELLOW};
-use vn_engine::engine::{EngineState, VNERunner};
+use vn_engine::engine::{VNERunner, VNEngineState};
 use vn_engine::render::{PixelPosition, VNERenderer};
-use crate::BufferUse::{FIRST, SECOND};
-use crate::SnowFlakeGridData::{BOUNDARY, EDGE, FROZEN, NOT_RECEPTIVE};
 
 enum BufferUse {
     FIRST,
@@ -102,18 +102,17 @@ struct HexGrid<CellData> {
 }
 
 impl<T> HexGrid<T> {
-    pub fn new<F>(cols: u32, rows: u32, init: F) -> HexGrid<T> where F: Fn(u32, u32) -> T {
+    pub fn new<F>(cols: u32, rows: u32, init: F) -> HexGrid<T>
+    where
+        F: Fn(u32, u32) -> T,
+    {
         let mut cells = Vec::with_capacity(rows as usize * cols as usize);
         for y in 0..rows {
             for x in 0..cols {
                 cells.push(init(x, y));
             }
         }
-        HexGrid {
-            rows,
-            cols,
-            cells,
-        }
+        HexGrid { rows, cols, cells }
     }
 
     fn idx(&self, col: u32, row: u32) -> usize {
@@ -149,37 +148,25 @@ impl<T> HexGrid<T> {
         let top_left = if is_top || (is_left && !is_offset_row) {
             None
         } else {
-            Some((
-                if is_offset_row { col } else { col - 1 },
-                row - 1,
-            ))
+            Some((if is_offset_row { col } else { col - 1 }, row - 1))
         };
 
         let top_right = if is_top || (is_right && is_offset_row) {
             None
         } else {
-            Some((
-                if is_offset_row { col + 1 } else { col },
-                row - 1,
-            ))
+            Some((if is_offset_row { col + 1 } else { col }, row - 1))
         };
 
         let bottom_left = if is_bottom || (is_left && !is_offset_row) {
             None
         } else {
-            Some((
-                if is_offset_row { col } else { col - 1 },
-                row + 1,
-            ))
+            Some((if is_offset_row { col } else { col - 1 }, row + 1))
         };
 
         let bottom_right = if is_bottom || (is_right && is_offset_row) {
             None
         } else {
-            Some((
-                if is_offset_row { col + 1 } else { col },
-                row + 1,
-            ))
+            Some((if is_offset_row { col + 1 } else { col }, row + 1))
         };
 
         HexNeighbors {
@@ -195,13 +182,17 @@ impl<T> HexGrid<T> {
 
 impl<T> HexGrid<T> {
     pub fn get(&self, col: u32, row: u32) -> Option<&T> {
-        if row >= self.rows || col >= self.cols { return None; }
+        if row >= self.rows || col >= self.cols {
+            return None;
+        }
         let idx = self.idx(col, row);
         Some(&self.cells[idx])
     }
 
     pub fn set(&mut self, col: u32, row: u32, data: T) {
-        if row >= self.rows || col >= self.cols { return; }
+        if row >= self.rows || col >= self.cols {
+            return;
+        }
         let idx = self.idx(col, row);
         self.cells[idx] = data;
     }
@@ -229,21 +220,29 @@ enum SnowFlakeGridData {
 }
 
 impl SnowFlakeGridData {
-    pub fn diffusing_moisture(&self) -> f64 { // u_t
+    pub fn diffusing_moisture(&self) -> f64 {
+        // u_t
         match self {
             FROZEN { .. } | BOUNDARY { .. } => 0.0,
             NOT_RECEPTIVE { moisture, .. } | EDGE { moisture, .. } => *moisture,
         }
     }
 
-    pub fn stable_moisture(&self) -> f64 { // v_t
+    pub fn stable_moisture(&self) -> f64 {
+        // v_t
         match self {
             FROZEN { moisture, .. } | BOUNDARY { moisture, .. } => *moisture,
             NOT_RECEPTIVE { .. } | EDGE { .. } => 0.0,
         }
     }
 
-    pub fn updated(&self, neighbors: &[&SnowFlakeGridData; 6], alpha: f64, beta: f64, gamma: f64) -> SnowFlakeGridData {
+    pub fn updated(
+        &self,
+        neighbors: &[&SnowFlakeGridData; 6],
+        alpha: f64,
+        beta: f64,
+        gamma: f64,
+    ) -> SnowFlakeGridData {
         let stable = match self {
             FROZEN { .. } | BOUNDARY { .. } => self.stable_moisture() + gamma,
             _ => self.stable_moisture(),
@@ -260,15 +259,14 @@ impl SnowFlakeGridData {
             }
         }
 
-        let diffusion = self.diffusing_moisture() + (alpha / 12.0) * (-6.0 * self.diffusing_moisture() + sum_nn);
+        let diffusion = self.diffusing_moisture()
+            + (alpha / 12.0) * (-6.0 * self.diffusing_moisture() + sum_nn);
         // let diffusion = self.diffusing_moisture() + (alpha / 2.0) * (sum_nn / 6.0 - self.diffusing_moisture());
 
         let moisture = diffusion + stable;
 
         match self {
-            FROZEN { .. } => {
-                FROZEN { moisture }
-            }
+            FROZEN { .. } => FROZEN { moisture },
             BOUNDARY { .. } => {
                 if moisture >= 1.0 {
                     FROZEN { moisture }
@@ -280,12 +278,12 @@ impl SnowFlakeGridData {
                 if has_frozen_nn {
                     BOUNDARY { moisture }
                 } else {
-                    NOT_RECEPTIVE { moisture: moisture.min(1.0).max(0.0) }
+                    NOT_RECEPTIVE {
+                        moisture: moisture.min(1.0).max(0.0),
+                    }
                 }
             }
-            EDGE { .. } => {
-                EDGE { moisture: beta }
-            }
+            EDGE { .. } => EDGE { moisture: beta },
         }
     }
 }
@@ -300,7 +298,12 @@ struct SnowFlake {
 
 impl SnowFlake {
     pub fn simulate_step<F>(&self, target: &mut SnowFlake, mut rules: F)
-        where F: FnMut(&SnowFlakeGridData, &HexGrid<SnowFlakeGridData>, &HexNeighbors) -> SnowFlakeGridData
+    where
+        F: FnMut(
+            &SnowFlakeGridData,
+            &HexGrid<SnowFlakeGridData>,
+            &HexNeighbors,
+        ) -> SnowFlakeGridData,
     {
         for y in 0..self.grid.rows {
             for x in 0..self.grid.cols {
@@ -319,8 +322,11 @@ impl SnowFlake {
         let seeds = rng.gen_range(2..4);
         let mut seed_locations = Vec::new();
         if cluster {
-            for seed in 0..seeds {
-                seed_locations.push((rng.gen_range(resolution - 5..resolution + 5), rng.gen_range(resolution - 5..resolution + 5)));
+            for _ in 0..seeds {
+                seed_locations.push((
+                    rng.gen_range(resolution - 5..resolution + 5),
+                    rng.gen_range(resolution - 5..resolution + 5),
+                ));
             }
         } else {
             seed_locations.push((resolution, resolution));
@@ -328,16 +334,25 @@ impl SnowFlake {
 
         SnowFlake {
             resolution,
-            grid: HexGrid::<SnowFlakeGridData>::new(resolution * 2 + 1, resolution * 2 + 1, |x, y| {
-                let distance = HexGrid::<SnowFlakeGridData>::distance((x, y), (resolution, resolution));
-                if seed_locations.contains(&(x, y)) {
-                    FROZEN { moisture: 1.0 }
-                } else if distance < resolution {
-                    NOT_RECEPTIVE { moisture: background }
-                } else {
-                    EDGE { moisture: background }
-                }
-            }),
+            grid: HexGrid::<SnowFlakeGridData>::new(
+                resolution * 2 + 1,
+                resolution * 2 + 1,
+                |x, y| {
+                    let distance =
+                        HexGrid::<SnowFlakeGridData>::distance((x, y), (resolution, resolution));
+                    if seed_locations.contains(&(x, y)) {
+                        FROZEN { moisture: 1.0 }
+                    } else if distance < resolution {
+                        NOT_RECEPTIVE {
+                            moisture: background,
+                        }
+                    } else {
+                        EDGE {
+                            moisture: background,
+                        }
+                    }
+                },
+            ),
         }
     }
 }
@@ -345,8 +360,7 @@ impl SnowFlake {
 fn rotate(p1: (f64, f64), angle: f64) -> (f64, f64) {
     let (x, y) = p1;
     let (sin, cos) = angle.sin_cos();
-    (x * cos - y * sin,
-     y * cos + x * sin)
+    (x * cos - y * sin, y * cos + x * sin)
 }
 
 impl Runner {
@@ -404,7 +418,13 @@ impl Runner {
         [t, tr, br, b, bl, tl]
     }
 
-    fn fill_hex(&self, pos: (u32, u32), scale: f64, color: RGBA, renderer: &mut impl VNERenderer) {
+    fn fill_hex(
+        &self,
+        pos: (u32, u32),
+        scale: f64,
+        color: RGBA,
+        renderer: &mut (impl VNERenderer + ?Sized),
+    ) {
         let [t, tr, br, b, bl, tl] = self.compute_hex_vertices(pos, scale);
 
         renderer.fill_triangle(tl, t, tr, color);
@@ -413,7 +433,13 @@ impl Runner {
         renderer.fill_triangle(bl, b, br, color);
     }
 
-    fn draw_hex(&self, pos: (u32, u32), scale: f64, color: RGBA, renderer: &mut impl VNERenderer) {
+    fn draw_hex(
+        &self,
+        pos: (u32, u32),
+        scale: f64,
+        color: RGBA,
+        renderer: &mut (impl VNERenderer + ?Sized),
+    ) {
         let [t, tr, br, b, bl, tl] = self.compute_hex_vertices(pos, scale);
 
         renderer.draw_line(t, tl, color);
@@ -426,11 +452,11 @@ impl Runner {
 }
 
 impl VNERunner for Runner {
-    fn setup(&mut self, _engine: &EngineState, renderer: &mut impl VNERenderer) {
+    fn setup(&mut self, _engine: &VNEngineState, renderer: &mut (impl VNERenderer + ?Sized)) {
         renderer.set_title("Flaky SnowFlake Generator!");
     }
 
-    fn tick(&mut self, _engine: &EngineState, renderer: &mut impl VNERenderer) {
+    fn tick(&mut self, _engine: &VNEngineState, renderer: &mut (impl VNERenderer + ?Sized)) {
         let mut iterations = self.iterations;
         let mut setting_nr = 0;
         for setting in self.settings.iter() {
@@ -457,17 +483,41 @@ impl VNERunner for Runner {
 
             self.iterations += 1;
             if self.iterations % 10 == 0 {
-                renderer.set_title(format!("Flaky SnowFlake Generator! Setting: {}; Iteration: {};", setting_nr, self.iterations).as_str());
+                renderer.set_title(
+                    format!(
+                        "Flaky SnowFlake Generator! Setting: {}; Iteration: {};",
+                        setting_nr, self.iterations
+                    )
+                    .as_str(),
+                );
             }
             let (snowflake, buffer) = self.snowflake_data();
             {
                 snowflake.simulate_step(buffer, |data, grid, neighbors| {
-                    let a = *neighbors.left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let b = *neighbors.top_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let c = *neighbors.top_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let f = *neighbors.right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let d = *neighbors.bottom_right.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
-                    let e = *neighbors.bottom_left.map(|(x, y)| grid.get(x, y).unwrap()).get_or_insert(&fallback);
+                    let a = *neighbors
+                        .left
+                        .map(|(x, y)| grid.get(x, y).unwrap())
+                        .get_or_insert(&fallback);
+                    let b = *neighbors
+                        .top_left
+                        .map(|(x, y)| grid.get(x, y).unwrap())
+                        .get_or_insert(&fallback);
+                    let c = *neighbors
+                        .top_right
+                        .map(|(x, y)| grid.get(x, y).unwrap())
+                        .get_or_insert(&fallback);
+                    let f = *neighbors
+                        .right
+                        .map(|(x, y)| grid.get(x, y).unwrap())
+                        .get_or_insert(&fallback);
+                    let d = *neighbors
+                        .bottom_right
+                        .map(|(x, y)| grid.get(x, y).unwrap())
+                        .get_or_insert(&fallback);
+                    let e = *neighbors
+                        .bottom_left
+                        .map(|(x, y)| grid.get(x, y).unwrap())
+                        .get_or_insert(&fallback);
 
                     let nn = [a, b, c, d, e, f];
 
@@ -509,7 +559,6 @@ impl VNERunner for Runner {
     }
 }
 
-
 /// Simulation is controlled by the settings.
 /// It stops when either the snowflake reaches the edge or the last setting ran out of iterations.
 ///
@@ -526,12 +575,32 @@ impl VNERunner for Runner {
 /// main reference i used https://www.patarnott.com/pdf/SnowCrystalGrowth.pdf
 fn main() {
     let settings = vec![
-        SimulationSetting { alpha: 2.0, beta: 0.5, gamma: 0.0001, iterations: 250 },
-        SimulationSetting { alpha: 1.0, beta: 0.1, gamma: 0.1, iterations: 30 },
-        SimulationSetting { alpha: 1.0, beta: 0.8, gamma: 0.01, iterations: 70 },
-        SimulationSetting { alpha: 1.0, beta: 0.3, gamma: 0.000001, iterations: 300 },
+        SimulationSetting {
+            alpha: 1.0,
+            beta: 0.8,
+            gamma: 0.01,
+            iterations: 70,
+        },
+        SimulationSetting {
+            alpha: 2.0,
+            beta: 0.5,
+            gamma: 0.0001,
+            iterations: 25,
+        },
+        SimulationSetting {
+            alpha: 1.0,
+            beta: 0.8,
+            gamma: 0.01,
+            iterations: 70,
+        },
+        SimulationSetting {
+            alpha: 1.0,
+            beta: 0.8,
+            gamma: 0.000001,
+            iterations: 50,
+        },
     ];
-    let mut engine = vn_engine::engine::VNEngine::new_opengl(1165, 1000, 2);
+    let mut engine = vn_engine::engine::VNEngine::new_sprite_based(1165, 1000, 2);
     let mut runner = Runner::new(28 * 3, settings, false);
     engine.run(&mut runner);
 }

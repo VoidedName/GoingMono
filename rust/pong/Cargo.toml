@@ -1,14 +1,9 @@
 [package]
-name = "vn_engine"
+name = "pong"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-device_query = "1.1.1"
-gl = "0.14.0"
-glutin = "0.30.3"
-glutin-winit = "0.2.1"
-raw-window-handle = "0.5.0"
-winit = "0.27.5"
+vn_engine = { path = "../vn_engine" }
