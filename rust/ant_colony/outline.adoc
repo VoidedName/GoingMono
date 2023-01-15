@@ -13,4 +13,4 @@ A few considerations:
 * Can paths degenerate?
 * Should there be fixed food sources?
 ** Should they have a limited amount of food and degrade?
-** Random influx of food "nodes"? (Let's say a leaf or some carcas fell into their hunting grounds)
+** Random influx of food "nodes"? (Let's say a leaf or some carcass fell into their hunting grounds)
