@@ -1,0 +1,9 @@
+:toc:
+
+= Ant Colony Simulation
+
+== Description
+The goal is to simulate the path network an ant colony produces. I can think of two separate approaches for this simulation.
+
+1. Cellular Automaton: Simulate the paths by having them "grow" organically from the hive to the food sources. To facilitate growing paths, the field could be saturated in a "resisting" field while paths are represented in a decrease in that resistance. There is also an attractive force towards food. These two forces balance out each other, causing branching. This could be implemented as a cellular automaton. Can paths degenerate? Should there be fixed food sources? Should they have a limited amount of food and degrade? Strengthening paths based on how long they exist?
+2. Agent Simulation: Simulated agents (the ants) seek out food and then return this food. Again forces will balance each other out, attracting agents towards food or the hive and punishing for deviating from the path. This could yield more dynamic paths, as the grid could be much finer (computation depends on the number of agents, not necessarily the entire plane). This would mainly be powered by path finding algorithms. Maybe some chance to deviate from the known path, to motivate branching / less "straight paths"?

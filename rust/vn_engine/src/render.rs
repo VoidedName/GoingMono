@@ -134,6 +134,17 @@ pub trait VNERenderer {
         }
     }
 
+    fn draw_triangle(
+        &mut self,
+        v1: PixelPosition,
+        v2: PixelPosition,
+        v3: PixelPosition,
+        color: RGBA,
+    ) {
+        self.draw_line(v1, v2, color);
+        self.draw_line(v2, v3, color);
+        self.draw_line(v3, v1, color);
+    }
 
     /// assumes clockwise vertex order
     fn fill_triangle(
@@ -159,6 +170,33 @@ pub trait VNERenderer {
                 if inside {
                     self.draw_pixel(point, color);
                 }
+            }
+        }
+    }
+
+    fn draw_rectangle(
+        &mut self,
+        top_left: PixelPosition,
+        bottom_right: PixelPosition,
+        color: RGBA
+    ) {
+        let top_right = PixelPosition { x: bottom_right.x, y: top_left.y };
+        let bottom_left = PixelPosition { x: top_left.x, y: bottom_right.y };
+        self.draw_line(top_left, top_right, color);
+        self.draw_line(top_right, bottom_right, color);
+        self.draw_line(bottom_right, bottom_left, color);
+        self.draw_line(bottom_left, top_left, color);
+    }
+
+    fn fill_rectangle(
+        &mut self,
+        top_left: PixelPosition,
+        bottom_right: PixelPosition,
+        color: RGBA
+    ) {
+        for y in top_left.y..=bottom_right.y {
+            for x in top_left.x..=bottom_right.x {
+                self.draw_pixel(PixelPosition{ x, y }, color);
             }
         }
     }
