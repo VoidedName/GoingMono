@@ -1,0 +1,30 @@
+#version 460
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D trails;
+layout(std430, binding = 1) buffer trailsBuffer {
+    float[] pheromones;
+};
+layout(std430, binding = 2) buffer newTrailsBuffer {
+    float[] newPheromones;
+};
+
+float valueAt(uint x, uint y) {
+    uint _x = uint(mod(x + imageSize(trails).x, imageSize(trails).x));
+    uint _y = uint(mod(y + imageSize(trails).y, imageSize(trails).y));
+    return pheromones[imageSize(trails).x * _y + _x] / 9.0;
+}
+
+void main() {
+    float pheromone = valueAt(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+    pheromone += valueAt(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y + 1);
+    pheromone += valueAt(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y - 1);
+    pheromone += valueAt(gl_GlobalInvocationID.x + 1, gl_GlobalInvocationID.y);
+    pheromone += valueAt(gl_GlobalInvocationID.x - 1, gl_GlobalInvocationID.y);
+    pheromone += valueAt(gl_GlobalInvocationID.x + 1, gl_GlobalInvocationID.y + 1);
+    pheromone += valueAt(gl_GlobalInvocationID.x + 1, gl_GlobalInvocationID.y - 1);
+    pheromone += valueAt(gl_GlobalInvocationID.x - 1, gl_GlobalInvocationID.y + 1);
+    pheromone += valueAt(gl_GlobalInvocationID.x - 1, gl_GlobalInvocationID.y - 1);
+    newPheromones[imageSize(trails).x * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = pheromone * 0.1;
+    float intensity = 1.0 - 1.0 / (pheromone + 1.0);
+    imageStore(trails, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(intensity, intensity, intensity, 1.0));
+}

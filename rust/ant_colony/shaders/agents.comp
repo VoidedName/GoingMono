@@ -1,0 +1,89 @@
+#version 460
+struct Agent {
+    float facing;
+    float rotation_speed;
+    vec2 position;
+
+    float speed;
+    float p1;
+    float p2;
+    float p3;
+
+    uint sense_distance;
+    float sense_angle;
+    uint sense_size;
+    float deposition_amount;
+
+    vec4 color;
+};
+
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D trails;
+layout(std430, binding = 1) buffer agentBuffer {
+    Agent agents[];
+};
+layout(std430, binding = 2) buffer trailsBuffer {
+    float[] pheromones;
+};
+
+float rand(vec2 co){
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+vec2 vec2ToPos(vec2 pos) {
+    return vec2(
+        mod(pos.x + imageSize(trails).x, imageSize(trails).x),
+        mod(pos.y + imageSize(trails).y, imageSize(trails).y)
+    );
+}
+
+float sense(float angle) {
+    Agent agent = agents[gl_GlobalInvocationID.x];
+    float sensed = 0.0;
+    ivec2 sense_pos = ivec2(vec2ToPos(vec2(
+        agent.position.x + cos(agent.facing + angle) * agent.sense_distance,
+        agent.position.y + sin(agent.facing + angle) * agent.sense_distance
+    )));
+    int sense_max = int(agent.sense_size)-1;
+    int sense_min = -sense_max;
+    for (int i=sense_min;i<=sense_max;i++) {
+        for (int j=sense_min;j<=sense_max;j++) {
+            sensed += pheromones[(sense_pos.y+i) * imageSize(trails).x + sense_pos.x+j];
+        }
+    }
+    return sensed;
+}
+
+void main() {
+    Agent agent = agents[gl_GlobalInvocationID.x];
+    float left = sense(agent.sense_angle);
+    float middle = sense(0.0);
+    float right = sense(-agent.sense_angle);
+
+    if (left > middle && right > middle) {
+        if (rand(agent.position) < 0.5) {
+            agent.facing += agent.rotation_speed;
+        } else {
+            agent.facing -= agent.rotation_speed;
+        }
+    } else if (left < middle && right < middle) {
+        // go straight with a wobble
+        agent.facing += rand(agent.position) * 3.12 / 8 * agent.rotation_speed;
+    } else if (left < right) {
+        // turn right
+        agent.facing -= agent.rotation_speed;
+    } else {
+        // turn left
+        agent.facing += agent.rotation_speed;
+    }
+
+    agent.position = vec2ToPos(vec2(agent.position.x + cos(agent.facing) * agent.speed, agent.position.y + sin(agent.facing) * agent.speed));
+
+    ivec2 pos = ivec2(int(agent.position.x), int(agent.position.y));
+    agents[gl_GlobalInvocationID.x] = agent;
+
+    pheromones[pos.y * imageSize(trails).x + pos.x] += agent.deposition_amount;
+    imageStore(trails, pos, mix(agent.color, imageLoad(trails, pos), agent.color.a));
+    imageStore(trails, pos, mix(imageLoad(trails, pos), agent.color, agent.color.a));
+}

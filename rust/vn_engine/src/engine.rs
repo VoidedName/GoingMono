@@ -12,6 +12,7 @@ use winit::window::Window;
 pub struct VNEngine<T: VNEFullRenderer> {
     event_loop: EventLoop<()>,
     engine_state: VNEngineState,
+    pause_on_focus_loss: bool,
     renderer: T,
 }
 
@@ -46,6 +47,7 @@ impl VNEngine<OpenGLRenderer> {
         let mut renderer = OpenGLRenderer::new(width, height, scale, &event_loop);
         Box::new(VNEngine {
             renderer,
+            pause_on_focus_loss: true,
             engine_state: VNEngineState {
                 width,
                 height,
@@ -60,11 +62,12 @@ impl VNEngine<OpenGLRenderer> {
 }
 
 impl VNEngine<SpriteBased> {
-    pub fn new_sprite_based(width: u32, height: u32, scale: u32) -> Box<VNEngine<SpriteBased>> {
+    pub fn new_sprite_based(width: u32, height: u32, scale: u32, pause_on_focus_loss: bool) -> Box<VNEngine<SpriteBased>> {
         let event_loop = EventLoop::new();
         let mut renderer = SpriteBased::new(width as usize, height as usize, scale, &event_loop);
         Box::new(VNEngine {
             renderer,
+            pause_on_focus_loss,
             engine_state: VNEngineState {
                 width,
                 height,
@@ -84,6 +87,7 @@ impl<T: VNEFullRenderer> VNEngine<T> {
         Box::new(VNEngine {
             event_loop,
             renderer,
+            pause_on_focus_loss: true,
             engine_state: VNEngineState {
                 focused: false,
                 delta: 0.0,
@@ -116,7 +120,7 @@ impl<T: VNEFullRenderer> VNEngine<T> {
                     self.engine_state.delta = delta as f64 / 1_000_000_000.0;
 
                     previous_frame_time = Instant::now();
-                    if delta > 0 && self.engine_state.focused {
+                    if delta > 0 && (self.engine_state.focused || !self.pause_on_focus_loss) {
                         let inner_pos = renderer.window().inner_position().unwrap();
                         self.engine_state.inner_mouse_pos = (inner_pos.x, inner_pos.y);
                         runner.tick(&self.engine_state, renderer);
