@@ -6,6 +6,7 @@ use std::time::SystemTime;
 
 use gl::types::{GLenum, GLfloat, GLint, GLsizei, GLsizeiptr, GLuint};
 use image::{DynamicImage, EncodableLayout, GenericImageView};
+use image::imageops::FilterType;
 use rand::distributions::Uniform;
 use rand::Rng;
 use rand_pcg::Pcg64;
@@ -298,7 +299,8 @@ struct OpenGLAgent {
 
     color: (f32, f32, f32, f32),
 }
-const TEXTURE_WIDTH: GLuint = 1920;
+// const TEXTURE_WIDTH: GLuint = 1920;
+const TEXTURE_WIDTH: GLuint = 1080;
 const TEXTURE_HEIGHT: GLuint = 1080;
 
 unsafe fn run(width: u32, height: u32, scale: f32) -> Result<(), ShaderError> {
@@ -378,7 +380,7 @@ unsafe fn run(width: u32, height: u32, scale: f32) -> Result<(), ShaderError> {
 
     // data
     let mut agents: Vec<OpenGLAgent> = Vec::with_capacity(5);
-    for _ in 0..(0.2 * (TEXTURE_WIDTH as f32 * TEXTURE_HEIGHT as f32)) as u32 {
+    for _ in 0..(0.05 * (TEXTURE_WIDTH as f32 * TEXTURE_HEIGHT as f32)) as u32 {
         agents.push(OpenGLAgent {
             position: (rng.gen_range(0.0..TEXTURE_WIDTH as f32), rng.gen_range(0.0..TEXTURE_HEIGHT as f32)),
             // position: (TEXTURE_WIDTH as f32 / 2.0 + rng.sample(Uniform::new(-1.0, 1.0)), TEXTURE_HEIGHT as f32 / 2.0  + rng.sample(Uniform::new(-1.0, 1.0))),
@@ -391,7 +393,7 @@ unsafe fn run(width: u32, height: u32, scale: f32) -> Result<(), ShaderError> {
             p3: 0.0,
 
             sense_distance: 9,
-            sense_angle: PI as f32 / 16.0,
+            sense_angle: PI as f32 / 8.0,
             sense_size: 1,
             deposition_amount: 5.0,
 
@@ -419,6 +421,16 @@ unsafe fn run(width: u32, height: u32, scale: f32) -> Result<(), ShaderError> {
     gl::BufferData(gl::SHADER_STORAGE_BUFFER, std::mem::size_of::<f32>() as GLsizeiptr * (TEXTURE_WIDTH * TEXTURE_HEIGHT) as isize, trails_starting_data.as_ptr().cast(), gl::STATIC_DRAW);
     gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 2, new_trails_buffer);
 
+    let pre_pattern = image::open(Path::new("assets/pre_pattern_haphazard.png")).unwrap()
+        .resize_exact(TEXTURE_WIDTH, TEXTURE_HEIGHT, FilterType::Gaussian)
+        .into_rgb32f();
+    let pre_pattern_data: Vec<_> = pre_pattern.into_iter().step_by(3).map(|v| *v).collect();
+
+    let mut pre_pattern_buffer: GLuint = 0;
+    gl::GenBuffers(1, &mut pre_pattern_buffer);
+    gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, pre_pattern_buffer);
+    gl::BufferData(gl::SHADER_STORAGE_BUFFER, std::mem::size_of::<f32>() as GLsizeiptr * (TEXTURE_WIDTH * TEXTURE_HEIGHT) as isize, pre_pattern_data.as_ptr().cast(), gl::STATIC_DRAW);
+    gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 3, pre_pattern_buffer);
 
     // update trails
     let trails_shader = fs::read_to_string(Path::new("shaders/update_trails.comp")).unwrap();
@@ -434,7 +446,7 @@ unsafe fn run(width: u32, height: u32, scale: f32) -> Result<(), ShaderError> {
         *control_flow = ControlFlow::Poll;
         let delta = time.elapsed().unwrap().as_secs_f64();
 
-        if delta > 1.0 / 60.0 {
+        if delta > 1.0 / 500.0 {
             frame += 1;
             if frame > 60 {
                 println!("{}", 1.0 / delta);
@@ -448,6 +460,7 @@ unsafe fn run(width: u32, height: u32, scale: f32) -> Result<(), ShaderError> {
             trails_program.set_int_uniform("trails", 0).unwrap();
             gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 1, trails_buffer);
             gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 2, new_trails_buffer);
+            gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 3, pre_pattern_buffer);
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, trails_image);
 

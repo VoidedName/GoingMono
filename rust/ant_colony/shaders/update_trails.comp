@@ -7,6 +7,9 @@ layout(std430, binding = 1) buffer trailsBuffer {
 layout(std430, binding = 2) buffer newTrailsBuffer {
     float[] newPheromones;
 };
+layout(std430, binding = 3) buffer prePatternBuffer {
+    float[] prePattern;
+};
 
 float valueAt(uint x, uint y) {
     uint _x = uint(mod(x + imageSize(trails).x, imageSize(trails).x));
@@ -24,7 +27,7 @@ void main() {
     pheromone += valueAt(gl_GlobalInvocationID.x + 1, gl_GlobalInvocationID.y - 1);
     pheromone += valueAt(gl_GlobalInvocationID.x - 1, gl_GlobalInvocationID.y + 1);
     pheromone += valueAt(gl_GlobalInvocationID.x - 1, gl_GlobalInvocationID.y - 1);
-    newPheromones[imageSize(trails).x * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = pheromone * 0.1;
+    newPheromones[imageSize(trails).x * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = pheromone * 0.1 + prePattern[imageSize(trails).x * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] * 0.1;
     float intensity = 1.0 - 1.0 / (pheromone + 1.0);
     imageStore(trails, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(intensity, intensity, intensity, 1.0));
 }
