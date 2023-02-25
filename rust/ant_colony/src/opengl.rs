@@ -18,6 +18,7 @@ use thiserror::Error;
 use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
+use crate::opengl::image_format::ImageFormatBase;
 
 #[derive(Debug, Error)]
 pub enum ShaderError {
@@ -175,7 +176,7 @@ impl Drop for Shader {
 }
 
 pub struct ShaderProgram {
-    pub id: GLuint,
+    pub id: GLuint
 }
 
 impl ShaderProgram {
@@ -246,6 +247,10 @@ impl Buffer {
 
     pub unsafe fn bind(&self) {
         gl::BindBuffer(self.target, self.id);
+    }
+
+    pub unsafe fn bind_base(&self, unit: GLuint) {
+        gl::BindBufferBase(self.target, unit, self.id);
     }
 
     pub unsafe fn set_data<D>(&self, data: &[D], usage: GLuint) {
@@ -335,19 +340,27 @@ macro_rules! set_attribute {
     }};
 }
 
-pub struct Texture {
+pub struct Texture<T: ImageFormatBase> {
     pub id: GLuint,
+    format: T,
 }
 
-impl Texture {
-    pub unsafe fn new() -> Self {
+impl<T: ImageFormatBase> Texture<T> {
+    pub unsafe fn new(format: T) -> Self {
         let mut id: GLuint = 0;
         gl::GenTextures(1, &mut id);
-        Self { id }
+
+        let _self = Self { id, format };
+        _self.bind();
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
+
+        _self
     }
 }
 
-impl Drop for Texture {
+impl<T: ImageFormatBase> Drop for Texture<T> {
     fn drop(&mut self) {
         unsafe {
             gl::DeleteTextures(1, [self.id].as_ptr());
@@ -355,33 +368,75 @@ impl Drop for Texture {
     }
 }
 
-impl Texture {
+pub enum ReadWriteAccess {
+    Read,
+    Write,
+    ReadWrite
+}
+
+impl ReadWriteAccess {
+    fn value(&self) -> GLenum {
+        match self {
+            Self::Read => gl::READ_ONLY,
+            Self::Write => gl::WRITE_ONLY,
+            Self::ReadWrite => gl::READ_WRITE,
+        }
+    }
+}
+
+
+pub mod image_format {
+    use gl::types::GLenum;
+
+    pub trait ImageFormatBase {
+        type RustDataType: Sized;
+        fn internal_format(&self) -> GLenum;
+        fn format(&self) -> GLenum;
+        fn data_type(&self) -> GLenum;
+    }
+
+    pub struct RGBAFloat {}
+
+    impl ImageFormatBase for RGBAFloat {
+        type RustDataType = [f32; 4];
+
+        fn internal_format(&self) -> GLenum {
+            gl::RGBA32F
+        }
+
+        fn format(&self) -> GLenum {
+            gl::RGBA
+        }
+
+        fn data_type(&self) -> GLenum {
+            gl::FLOAT
+        }
+    }
+}
+
+impl<T: ImageFormatBase> Texture<T> {
     pub unsafe fn bind(&self) {
         gl::BindTexture(gl::TEXTURE_2D, self.id);
     }
 
-    pub unsafe fn load(&self, path: &Path) -> Result<(), ImageError> {
+    pub unsafe fn bind_image(&self, unit: GLuint, access: ReadWriteAccess) {
+        gl::BindImageTexture(unit, self.id, 0, gl::FALSE, 0, access.value(), self.format.internal_format());
+    }
+
+    // might need a different setter for other types of textures...
+    pub unsafe fn set_data(&self, width: i32, height: i32, data: &[T::RustDataType]) {
         self.bind();
-        let img = image::open(path)?.into_rgba32f();
-        gl::TexStorage2D(
-            gl::TEXTURE_2D,
-            1,
-            gl::RGBA32F,
-            img.width() as i32,
-            img.height() as i32,
-        );
-        gl::TexSubImage2D(
+        gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
+            self.format.internal_format() as GLint,
+            width as i32,
+            height as i32,
             0,
-            0,
-            img.width() as i32,
-            img.height() as i32,
-            gl::RGBA,
-            gl::FLOAT,
-            img.as_bytes().as_ptr() as *const _,
+            self.format.format(),
+            self.format.data_type(),
+            data.as_ptr().cast(),
         );
-        Ok(())
     }
 
     pub unsafe fn activate(&self, unit: GLuint) {

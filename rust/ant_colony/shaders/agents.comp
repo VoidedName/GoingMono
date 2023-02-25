@@ -4,9 +4,9 @@ struct Agent {
     float rotation_speed;
     vec2 position;
 
-    float speed;
-    float p1;
-    float p2;
+    float min_speed;
+    float max_speed;
+    float rotation_bias;
     float p3;
 
     uint sense_distance;
@@ -69,7 +69,7 @@ void main() {
         }
     } else if (left < middle && right < middle) {
         // go straight with a wobble
-        agent.facing += rand(agent.position) * 3.12 / 8 * agent.rotation_speed;
+        agent.facing += rand(agent.position) * 3.12 / 8 * agent.rotation_speed * agent.rotation_bias;
     } else if (left < right) {
         // turn right
         agent.facing -= agent.rotation_speed;
@@ -78,7 +78,11 @@ void main() {
         agent.facing += agent.rotation_speed;
     }
 
-    agent.position = vec2ToPos(vec2(agent.position.x + cos(agent.facing) * agent.speed, agent.position.y + sin(agent.facing) * agent.speed));
+    float speed = mix(agent.min_speed, agent.max_speed, 1.0 - (1.0 / (1 + pow(pheromones[int(agent.position.y) * imageSize(trails).x + int(agent.position.x)], 4))));
+    agent.position = vec2ToPos(vec2(
+        agent.position.x + cos(agent.facing) * speed,
+        agent.position.y + sin(agent.facing) * speed)
+    );
 
     ivec2 pos = ivec2(int(agent.position.x), int(agent.position.y));
     agents[gl_GlobalInvocationID.x] = agent;
