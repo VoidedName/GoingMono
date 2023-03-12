@@ -1,0 +1,22 @@
+= Particle Life Readme
+
+The goal is to implement something inspired by particle life as seen https://www.ventrella.com/Clusters/[here]
+
+== Outline
+=== Particle Properties
+
+* Position
+* Velocity
+* Colour
+** This can be interpreted as a "species"
+
+=== World Properties
+
+* Cyclical
+** Just don't want to deal with edge collision, not that it's a problem...
+* Drag
+** Represents entropy and prevents the systems forces from exploding
+* Attraction Forces
+** A Particle is either attracted or repelled by other Particles based on their distance and colour match up. This pairing is not symmetrical, meaning that in general stem:[F_{red->blue}] does not imply stem:[F_{blue->red}]
+** Forces have a maximum range
+** Colour based force is overwritten by a universal repelling force in proximity. This prevents collapsing to a single point.
