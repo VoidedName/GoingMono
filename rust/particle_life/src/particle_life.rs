@@ -73,11 +73,14 @@ impl World {
             .map(|(idx1, p1)| {
                 let mut p = p1.clone();
                 p.velocity = p.velocity * p.drag;
+                p.position = Vec2 {
+                    x: (p.position.x + p.velocity.x + self.size.0 as f32) % (self.size.0 as f32),
+                    y: (p.position.y + p.velocity.y + self.size.1 as f32) % (self.size.1 as f32),
+                };
                 for (idx2, p2) in self.particles.iter().enumerate() {
                     if idx2 != idx1 {
                         if let Some(force) = self.forces.get(&(p1.colour, p2.colour)) {
-                            p.velocity =
-                                p.velocity + force.f(&p.position, &p2.position)
+                            p.velocity = p.velocity + force.f(&p.position, &p2.position)
                         }
                     }
                 }

@@ -20,6 +20,106 @@ use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
 
+pub mod quad {
+    use crate::opengl::{Buffer, Shader, ShaderError, ShaderProgram, VertexArray};
+    use crate::set_attribute;
+    use gl::types::GLsizei;
+    use std::ptr;
+
+    type Pos = [f32; 2];
+    type TextureCoords = [f32; 2];
+
+    #[repr(C, packed)]
+    struct Vertex(Pos, TextureCoords);
+
+    #[rustfmt::skip]
+    const VERTICES: [Vertex; 4] = [
+        Vertex([-1.0, -1.0], [0.0, 1.0]),
+        Vertex([1.0, -1.0], [1.0, 1.0]),
+        Vertex([1.0, 1.0], [1.0, 0.0]),
+        Vertex([-1.0, 1.0], [0.0, 0.0]),
+    ];
+
+    #[rustfmt::skip]
+    const INDICES: [i32; 6] = [
+        0, 1, 2,
+        2, 3, 0
+    ];
+    pub const QUAD_VERTEX_POSITION: &str = "position";
+    pub const QUAD_RESOLUTION_TEXTURE_COORDINATES: &str = "vertexTexCoord";
+
+    pub const QUAD_MOUSE_UNIFORM: &str = "u_mouse";
+    pub const QUAD_RESOLUTION_UNIFORM: &str = "u_resolution";
+
+    pub struct Quad {
+        pub program: ShaderProgram,
+        pub vertex_array: VertexArray,
+        vertex_buffer: Buffer,
+        index_buffer: Buffer,
+    }
+
+    impl Quad {
+        pub unsafe fn new(
+            vertex_shader: Shader,
+            fragment_shader: Shader,
+        ) -> Result<Self, ShaderError> {
+            let program = ShaderProgram::new(&[vertex_shader, fragment_shader])?;
+
+            let vertex_array = VertexArray::new();
+            vertex_array.bind();
+
+            let vertex_buffer = Buffer::new(gl::ARRAY_BUFFER);
+            vertex_buffer.set_data(&VERTICES, gl::STATIC_DRAW);
+
+            let index_buffer = Buffer::new(gl::ELEMENT_ARRAY_BUFFER);
+            index_buffer.set_data(&INDICES, gl::STATIC_DRAW);
+
+            let pos_attrib = program.get_attrib_location(QUAD_VERTEX_POSITION)?;
+            set_attribute!(vertex_array, pos_attrib, Vertex::0);
+
+            Ok(Self {
+                program,
+                vertex_array,
+                vertex_buffer,
+                index_buffer,
+            })
+        }
+
+        pub unsafe fn draw(&self, resolution: (f32, f32), mouse_pos: (f32, f32)) {
+            self.program.apply();
+            self.program
+                .set_float32_2_uniform(QUAD_RESOLUTION_UNIFORM, resolution.0, resolution.1)
+                .unwrap();
+            self.program
+                .set_float32_2_uniform(QUAD_MOUSE_UNIFORM, mouse_pos.0, mouse_pos.1)
+                .unwrap();
+            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
+        }
+
+        pub unsafe fn draw_instanced(
+            &self,
+            resolution: (f32, f32),
+            mouse_pos: (f32, f32),
+            instances: usize,
+        ) {
+            self.program.apply();
+            self.program
+                .set_float32_2_uniform(QUAD_RESOLUTION_UNIFORM, resolution.0, resolution.1)
+                .unwrap();
+            self.program
+                .set_float32_2_uniform(QUAD_MOUSE_UNIFORM, mouse_pos.0, mouse_pos.1)
+                .unwrap();
+            gl::DrawElementsInstanced(
+                gl::TRIANGLES,
+                6,
+                gl::UNSIGNED_INT,
+                ptr::null(),
+                instances as GLsizei,
+            );
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum ShaderError {
     #[error("Error while compiling shader: {0}")]
@@ -221,6 +321,44 @@ impl ShaderProgram {
         self.apply();
         let uniform = CString::new(name)?;
         gl::Uniform1i(gl::GetUniformLocation(self.id, uniform.as_ptr()), value);
+        Ok(())
+    }
+
+    pub unsafe fn set_float32_uniform(&self, name: &str, value: f32) -> Result<(), ShaderError> {
+        self.apply();
+        let uniform = CString::new(name)?;
+        gl::Uniform1f(gl::GetUniformLocation(self.id, uniform.as_ptr()), value);
+        Ok(())
+    }
+
+    pub unsafe fn set_float32_2_uniform(
+        &self,
+        name: &str,
+        value1: f32,
+        value2: f32,
+    ) -> Result<(), ShaderError> {
+        self.apply();
+        let uniform = CString::new(name)?;
+        gl::Uniform2f(
+            gl::GetUniformLocation(self.id, uniform.as_ptr()),
+            value1,
+            value2,
+        );
+        Ok(())
+    }
+
+    pub unsafe fn set_float32_2_uniform_vector(
+        &self,
+        name: &str,
+        data: &[(f32, f32)],
+    ) -> Result<(), ShaderError> {
+        self.apply();
+        let uniform = CString::new(name)?;
+        gl::Uniform2fv(
+            gl::GetUniformLocation(self.id, uniform.as_ptr()),
+            data.len() as GLsizei,
+            data.as_ptr().cast(),
+        );
         Ok(())
     }
 }
