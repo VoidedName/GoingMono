@@ -1,8 +1,8 @@
-//// http://www-db.deis.unibo.it/courses/SI-LS/papers/Gut84.pdf
+//source: http://www-db.deis.unibo.it/courses/SI-LS/papers/Gut84.pdf
 
 use crate::geometry2d::{Coordinate, Rectangle};
 use crate::r_tree::Entry::Leaf;
-use crate::r_tree::RTreeError::{MaxMustBeAtLeastTwo, MinMustBeAtMostHalfOfMax};
+use crate::r_tree::RTreeError::{MaxMustBeAtLeastFour, MinMustBeAtLeastTwo, MinMustBeAtMostHalfOfMax};
 use either::{Either, Left, Right};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -51,8 +51,9 @@ struct Config {
 
 #[derive(Debug)]
 pub enum RTreeError {
-    MaxMustBeAtLeastTwo,
+    MaxMustBeAtLeastFour,
     MinMustBeAtMostHalfOfMax,
+    MinMustBeAtLeastTwo,
 }
 
 #[derive(Debug, Clone)]
@@ -72,11 +73,12 @@ enum InsertionResult<T: Coordinate, O: ObjectId> {
 }
 
 enum DeleteResult<T: Coordinate, O: ObjectId> {
+    /// found and removed
     Success,
-    // found and removed
+    /// record could not be found
     NoSuchRecord,
-    // record could not be found
-    Dissolved(Vec<Either<ObjectRecord<T, O>, ChildRecord<T, O>>>, bool), // found and removed, but rebalance needed
+    /// found and removed, but rebalance needed
+    Dissolved(Vec<Either<ObjectRecord<T, O>, ChildRecord<T, O>>>, bool),
 }
 
 //////////////////
@@ -95,10 +97,12 @@ impl<T: Coordinate, O: ObjectId> RTree<T, O> {
 
 impl Config {
     pub fn new(max: usize, min: usize) -> Result<Self, RTreeError> {
-        if max < 2 {
-            Err(MaxMustBeAtLeastTwo)
+        if max < 4 {
+            Err(MaxMustBeAtLeastFour)
         } else if min > max / 2 {
             Err(MinMustBeAtMostHalfOfMax {})
+        } else if min < 2 {
+            Err(MinMustBeAtLeastTwo)
         } else {
             Ok(Config {
                 maximum_entries_per_node: max,
