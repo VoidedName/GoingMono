@@ -66,7 +66,7 @@ impl<T: Coordinate, O: ObjectId> Entry<T, O> {
             NonLeaf { children, level } => {
                 let sink = match &record {
                     Left(_) => true,
-                    Right(record) => record.1.level() + 1 == *level,
+                    Right(ChildRecord(.., child)) => child.level() + 1 == *level,
                 };
 
                 if sink {
@@ -85,7 +85,7 @@ impl<T: Coordinate, O: ObjectId> Entry<T, O> {
                             best_candidate = candidate;
                         }
                     }
-                    let mut candidate = &mut children[best_candidate];
+                    let mut  candidate = &mut children[best_candidate];
                     candidate.0 = best_mbb;
                     match candidate.1.insert(config, record) {
                         NoSplit => NoSplit,
@@ -212,7 +212,11 @@ impl<T: Coordinate, O: ObjectId> Entry<T, O> {
         let to_split = match self {
             Leaf { children } => {
                 if children.len() > config.maximum_entries_per_node {
-                    let boxes: Vec<_> = children.iter().map(|c| c.0).enumerate().collect();
+                    let boxes: Vec<_> = children
+                        .iter()
+                        .map(|ObjectRecord(rec, ..)| *rec)
+                        .enumerate()
+                        .collect();
                     Some(boxes)
                 } else {
                     None
@@ -220,7 +224,11 @@ impl<T: Coordinate, O: ObjectId> Entry<T, O> {
             }
             NonLeaf { children, .. } => {
                 if children.len() > config.maximum_entries_per_node {
-                    let boxes: Vec<_> = children.iter().map(|c| c.0).enumerate().collect();
+                    let boxes: Vec<_> = children
+                        .iter()
+                        .map(|ChildRecord(rec, ..)| *rec)
+                        .enumerate()
+                        .collect();
                     Some(boxes)
                 } else {
                     None

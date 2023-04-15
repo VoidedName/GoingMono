@@ -4,7 +4,7 @@
 
 use crate::geometry2d::{Coordinate, Point, Rectangle};
 use crate::r_tree::Entry::{Leaf, NonLeaf};
-use crate::r_tree::{Entry, ObjectId, RTree};
+use crate::r_tree::{ChildRecord, Entry, ObjectId, ObjectRecord, RTree};
 
 impl<T: Coordinate, O: ObjectId> RTree<T, O> {
     pub fn search_area(&self, area: &Rectangle<T>) -> Vec<O> {
@@ -30,13 +30,13 @@ impl<T: Coordinate, O: ObjectId> Entry<T, O> {
         match self {
             Leaf { children } => children
                 .iter()
-                .filter(|a| a.0.intersects(area))
-                .map(|c| c.1)
+                .filter(|ObjectRecord(rec, ..)| rec.intersects(area))
+                .map(|ObjectRecord(.., oid)| *oid)
                 .collect(),
             NonLeaf { children, .. } => children
                 .iter()
-                .filter(|a| a.0.intersects(area))
-                .flat_map(|a| a.1.search(area))
+                .filter(|ChildRecord(rec, ..)| rec.intersects(area))
+                .flat_map(|ChildRecord(.., entry)| entry.search(area))
                 .collect(),
         }
     }
