@@ -43,7 +43,7 @@ impl<T: Coordinate + Display, O: ObjectId + Display> Entry<T, O> {
                 (label, result)
             }
             NonLeaf { children, .. } => {
-                let mut last_used_label = label + 1;
+                let mut last_used_label = label;
                 for ChildRecord(rec, child) in children {
                     let child_label = last_used_label + 1;
                     result += format!("\tn{} [label=\"{{({}, {}), ({}, {})|node:{}}}\", shape=record, style=filled, fillcolor=red, fontcolor=white];\n",
