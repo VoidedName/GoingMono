@@ -2,7 +2,9 @@
 
 use crate::geometry2d::{Coordinate, Rectangle};
 use crate::r_tree::Entry::Leaf;
-use crate::r_tree::RTreeError::{MaxMustBeAtLeastFour, MinMustBeAtLeastTwo, MinMustBeAtMostHalfOfMax};
+use crate::r_tree::RTreeError::{
+    MaxMustBeAtLeastFour, MinMustBeAtLeastTwo, MinMustBeAtMostHalfOfMax,
+};
 use either::{Either, Left, Right};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -12,6 +14,7 @@ mod delete;
 mod display;
 mod insert;
 mod query;
+mod vizgraph;
 
 pub trait ObjectId: Eq + Hash + Copy + Clone + Debug {}
 

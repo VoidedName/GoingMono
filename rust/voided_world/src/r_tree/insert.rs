@@ -85,7 +85,7 @@ impl<T: Coordinate, O: ObjectId> Entry<T, O> {
                             best_candidate = candidate;
                         }
                     }
-                    let mut  candidate = &mut children[best_candidate];
+                    let mut candidate = &mut children[best_candidate];
                     candidate.0 = best_mbb;
                     match candidate.1.insert(config, record) {
                         NoSplit => NoSplit,

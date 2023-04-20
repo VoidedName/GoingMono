@@ -90,50 +90,15 @@ fn main() {
             },
             12,
         ),
-        ObjectRecord(
-            Rectangle {
-                low: Point::new(7.0, 3.0),
-                high: Point::new(8.0, 6.0),
-            },
-            13,
-        ),
-        ObjectRecord(
-            Rectangle {
-                low: Point::new(7.0, 3.0),
-                high: Point::new(8.0, 6.0),
-            },
-            14,
-        ),
-        ObjectRecord(
-            Rectangle {
-                low: Point::new(7.0, 3.0),
-                high: Point::new(8.0, 6.0),
-            },
-            15,
-        ),
-        ObjectRecord(
-            Rectangle {
-                low: Point::new(7.0, 3.0),
-                high: Point::new(8.0, 6.0),
-            },
-            16,
-        ),
-        ObjectRecord(
-            Rectangle {
-                low: Point::new(7.0, 3.0),
-                high: Point::new(8.0, 6.0),
-            },
-            17,
-        ),
     ];
 
-    let mut tree = RTree::new(8, 2).unwrap();
+    let mut tree = RTree::new(4, 2).unwrap();
 
     for rec in records.iter() {
         tree.insert(rec.clone());
     }
 
-    println!("{}", tree);
+    println!("{}", tree.to_vizgraph("RTREE"));
     println!(
         "{:?}",
         tree.search_area(&Rectangle {
@@ -141,7 +106,7 @@ fn main() {
             high: Point::new(7.0, 7.0)
         })
     );
-    println!("{:?}", tree.search_point(&Point::new(5.0, 5.0)));
+    println!("{:?}", tree.search_point(&Point::new(7.0, 7.0)));
 
     tree.delete(records[0].clone());
     tree.delete(records[1].clone());
@@ -155,11 +120,6 @@ fn main() {
     tree.delete(records[9].clone());
     tree.delete(records[10].clone());
     tree.delete(records[11].clone());
-    tree.delete(records[12].clone());
-    tree.delete(records[13].clone());
-    tree.delete(records[14].clone());
-    tree.delete(records[15].clone());
-    tree.delete(records[16].clone());
 
     println!("{}", tree);
 }
