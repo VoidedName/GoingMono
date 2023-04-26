@@ -1,64 +1,62 @@
-import {componentBuilder, ComponentFor} from "./framework/state";
-import {useEffect, useState} from "react";
+import {createBrowserRouter, isRouteErrorResponse, Link, Outlet, RouterProvider, useRouteError} from "react-router-dom";
+import SimpleCounter from "./examples/simple-counter";
+import {componentBuilder, ComponentFor} from "./framework/builder";
 
-const builder = componentBuilder()
-    .withState("counter", () => 0)
+const routerErrorBuilder = componentBuilder()
+    .withHook("error", useRouteError)
 
-export const helloWorld: ComponentFor<typeof builder, { name: string }> = (p) => [
-    <div>
-        <p>Hello {p.name}</p>
-        <button onClick={() => p.setCounter(prev => (prev + 1) % 100)}>
-            {p.counter}
-        </button>
-    </div>,
+const routerError: ComponentFor<typeof routerErrorBuilder> = ({error}) => {
+    if (isRouteErrorResponse(error)) {
+        return <div id={"error-page"}>
+            <h1>{error.status} - {error.statusText}</h1>
+            {error.error?.message}
+        </div>
+    }
 
-     [() => {
-        const id = setTimeout(() => {
-            p.setCounter(prev => (prev + 1) % 100)
-        }, 1000)
-        return () => clearTimeout(id)
-    }, [p.counter]]
-]
+    // Last resort fallback
+    console.error("Something unexpected happened", error)
 
-const HelloWorld = builder.toReactComponent(helloWorld);
-
-const useCounterState = (init: number) => {
-    return useState(init);
-}
-
-const useCounter = () => {
-    const [counter, setCounter] = useCounterState(0);
-
-    useEffect(() => {
-        const id = setTimeout(() => {
-            setCounter(prev => (prev + 1) % 100)
-        }, 1000)
-        return () => {
-            clearTimeout(id)
-        }
-    }, [counter])
-
-    return [counter, setCounter] as const;
-}
-
-const ImpureHelloWorld = (p: {name: string}) => {
-    const [counter, setCounter] = useCounter()
-
-    return <div>
-        <p>Hello {p.name}</p>
-        <button onClick={() => setCounter(prev => (prev + 1) % 100)}>
-            {counter}
-        </button>
+    return <div id={"error-page"}>
+        <h1>v_v' something bad happened...</h1>
+        This is a catch all error page, if you're seeing this, it means this error is unexpected and a bug!
     </div>
 }
 
-function App() {
-    return (
-        <div className="App">
-            <HelloWorld name={"World"}/>
-            <ImpureHelloWorld name={"Impure World"} />
+const RouterError = routerErrorBuilder.toReactComponent(routerError)
+
+const router = createBrowserRouter([
+    {
+        path: "/",
+        element: <Root/>,
+        errorElement: <RouterError />,
+        children: [
+            {
+                path: "simple-counter",
+                element: <SimpleCounter/>,
+            },
+        ]
+    },
+]);
+
+function Root() {
+    return <>
+        <div id={"sidebar"}>
+            <h1>Menu</h1>
+            <nav>
+                <ul>
+                    <li><Link to={""}>Index</Link></li>
+                    <li><Link to={"simple-counter"}>Simple Counter</Link></li>
+                </ul>
+            </nav>
         </div>
-    )
+        <div id={"content"}>
+            <Outlet/>
+        </div>
+    </>
+}
+
+function App() {
+    return <RouterProvider router={router}/>
 }
 
 export default App

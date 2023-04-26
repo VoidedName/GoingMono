@@ -1,7 +1,7 @@
-import {destructureResult} from "../src/framework/component";
+import {destructureResult} from "../../../src/framework/component";
 import {expect, test, vi} from "vitest";
 import {fireEvent, render, screen} from "@testing-library/react";
-import {helloWorld} from "../src/App";
+import {helloWorld} from "../../../src/examples/simple-counter";
 
 describe("hello world tests", () => {
 
@@ -16,7 +16,12 @@ describe("hello world tests", () => {
     test("renders text", () => {
         let value = 42;
         let [jsx] = destructureResult(
-            helloWorld({counter: value, setCounter: (f) => value = f(value), name: "World"})
+            helloWorld({
+                counter: [value, (f) => {
+                    if (typeof f === "function") value = f(value)
+                    else value = f
+                }], name: "World"
+            })
         );
 
         render(jsx)
@@ -27,7 +32,12 @@ describe("hello world tests", () => {
     test("click increments state", () => {
         let value = 42;
         let [jsx] = destructureResult(
-            helloWorld({counter: value, setCounter: (f) => value = f(value), name: "World"})
+            helloWorld({
+                counter: [value, (f) => {
+                    if (typeof f === "function") value = f(value)
+                    else value = f
+                }], name: "World"
+            })
         );
 
         render(jsx)
@@ -39,7 +49,12 @@ describe("hello world tests", () => {
     test("click wraps around on 100", () => {
         let value = 99;
         let [jsx] = destructureResult(
-            helloWorld({counter: value, setCounter: (f) => value = f(value), name: "World"})
+            helloWorld({
+                counter: [value, (f) => {
+                    if (typeof f === "function") value = f(value)
+                    else value = f
+                }], name: "World"
+            })
         );
 
         render(jsx)
@@ -51,7 +66,12 @@ describe("hello world tests", () => {
     test("auto increments in 1000ms steps", async () => {
         let value = 42;
         let [_, [update, deps]] = destructureResult(
-            helloWorld({counter: value, setCounter: (f) => value = f(value), name: "World"})
+            helloWorld({
+                counter: [value, (f) => {
+                    if (typeof f === "function") value = f(value)
+                    else value = f
+                }], name: "World"
+            })
         );
 
         expect(update).toBeDefined()
@@ -69,7 +89,12 @@ describe("hello world tests", () => {
     test("auto increments wraps around on 100", async () => {
         let value = 99;
         let [_, [update, deps]] = destructureResult(
-            helloWorld({counter: value, setCounter: (f) => value = f(value), name: "World"})
+            helloWorld({
+                counter: [value, (f) => {
+                    if (typeof f === "function") value = f(value)
+                    else value = f
+                }], name: "World"
+            })
         );
 
         expect(update).toBeDefined()
