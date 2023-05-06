@@ -1,6 +1,8 @@
 import {createBrowserRouter, isRouteErrorResponse, Link, Outlet, RouterProvider, useRouteError} from "react-router-dom";
 import SimpleCounter from "./examples/simple-counter";
 import {componentBuilder, ComponentFor} from "./framework/builder";
+import {TodoRouter} from "./examples/todos";
+import Navigation from "./routing";
 
 const routerErrorBuilder = componentBuilder()
     .withHook("error", useRouteError)
@@ -27,33 +29,21 @@ const RouterError = routerErrorBuilder.toReactComponent(routerError)
 const router = createBrowserRouter([
     {
         path: "/",
-        element: <Root/>,
+        element: <Navigation title={"Menu"} links={[
+            {path: "", display: "Index"},
+            {path: "simple-counter", display: "Simple Counter"},
+            {path: "todos", display: "Todos", always_active: true},
+        ]} />,
         errorElement: <RouterError />,
         children: [
             {
                 path: "simple-counter",
                 element: <SimpleCounter/>,
             },
+            TodoRouter,
         ]
     },
 ]);
-
-function Root() {
-    return <>
-        <div id={"sidebar"}>
-            <h1>Menu</h1>
-            <nav>
-                <ul>
-                    <li><Link to={""}>Index</Link></li>
-                    <li><Link to={"simple-counter"}>Simple Counter</Link></li>
-                </ul>
-            </nav>
-        </div>
-        <div id={"content"}>
-            <Outlet/>
-        </div>
-    </>
-}
 
 function App() {
     return <RouterProvider router={router}/>

@@ -71,7 +71,7 @@ void main() {
 
 const TEXTURE_WIDTH: GLuint = 1080 * 2;
 const TEXTURE_HEIGHT: GLuint = 1080;
-const NUMBER_OF_PARTICLES: usize = 500;
+const NUMBER_OF_PARTICLES: usize = 2000;
 fn main() {
     let my_colors: Vec<Colour> = vec![
         Colour {
@@ -93,47 +93,45 @@ fn main() {
             b: 1.0,
         },
     ];
-    let mut world = World {
-        particles: vec![],
-        forces: HashMap::new(),
-        size: (TEXTURE_WIDTH, TEXTURE_HEIGHT),
-    };
 
-    world.forces.insert(
+    let mut forces = HashMap::new();
+    forces.insert(
         (my_colors[0], my_colors[0]),
         Force {
-            force: -1.0,
-            d_repel: 20.0,
-            d_colour: 200.0,
+            force: -0.01,
+            d_repel: 5.0,
+            d_colour: 100.0,
         },
     );
 
-    world.forces.insert(
+    forces.insert(
         (my_colors[1], my_colors[1]),
         Force {
-            force: -1.0,
-            d_repel: 20.0,
-            d_colour: 200.0,
+            force: -0.01,
+            d_repel: 5.0,
+            d_colour: 100.0,
         },
     );
 
-    world.forces.insert(
+    forces.insert(
         (my_colors[0], my_colors[1]),
         Force {
-            force: -1.0,
-            d_repel: 20.0,
-            d_colour: 200.0,
+            force: -0.1,
+            d_repel: 5.0,
+            d_colour: 100.0,
         },
     );
 
-    world.forces.insert(
+    forces.insert(
         (my_colors[1], my_colors[0]),
         Force {
-            force: 1.0,
-            d_repel: 20.0,
-            d_colour: 200.0,
+            force: 0.1,
+            d_repel: 5.0,
+            d_colour: 100.0,
         },
     );
+
+    let mut world = World::new((TEXTURE_WIDTH, TEXTURE_HEIGHT), forces, vec![]);
 
     unsafe {
         let (graphics, event_loop) = Graphics::new(TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0);
@@ -158,7 +156,7 @@ fn main() {
                 },
                 velocity: Vec2 { x: 0.0, y: 1.0 },
                 colour: my_colors[col],
-                drag: 0.1,
+                drag: 0.8,
             })
         }
 

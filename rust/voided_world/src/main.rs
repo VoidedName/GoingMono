@@ -1,7 +1,9 @@
 mod geometry2d;
+mod graphviz;
 mod r_tree;
 
 use crate::geometry2d::{Point, Rectangle};
+use crate::graphviz::GVGraph;
 use crate::r_tree::{ObjectRecord, RTree};
 
 fn main() {
@@ -98,7 +100,10 @@ fn main() {
         tree.insert(rec.clone());
     }
 
-    println!("{}", tree.to_vizgraph("RTREE"));
+    let graph: GVGraph<String> = tree.clone().into();
+
+    println!("{}", graph);
+
     println!(
         "{:?}",
         tree.search_area(&Rectangle {
