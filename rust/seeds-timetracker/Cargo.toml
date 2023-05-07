@@ -1,0 +1,34 @@
+[package]
+version = "0.1.0"
+name = "seeds-timetracker"
+repository = "https://github.com/seed-rs/seed-quickstart"
+authors = ["VoidedName"]
+description = "App Description"
+categories = ["category"]
+license = "MIT"
+readme = "./README.md"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.18"
+
+[dependencies]
+chrono = "0.4.24"
+gloo-console = "0.2.3"
+gloo-net = "0.2.6"
+rusty_ulid = { version = "2.0.0", default-features = false, features = ["chrono", "rand", "serde"] }
+seed = { version = "0.10.0", features = ["routing"] }
+serde = "1.0.162"
+serde-wasm-bindgen = "0.5.0"
+wasm-bindgen-futures = "0.4.34"
+
+[profile.release]
+lto = true
+opt-level = 'z'
+codegen-units = 1
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-Os']
