@@ -1,0 +1,762 @@
+directive @dgraph(type: String, pred: String) on OBJECT | INTERFACE | FIELD_DEFINITION
+
+directive @custom(http: CustomHTTP, dql: String) on FIELD_DEFINITION
+
+directive @remote on OBJECT | INTERFACE | UNION | INPUT_OBJECT | ENUM
+
+directive @generate(query: GenerateQueryParams, mutation: GenerateMutationParams, subscription: Boolean) on OBJECT | INTERFACE
+
+directive @id on FIELD_DEFINITION
+
+directive @withSubscription on OBJECT | INTERFACE | FIELD_DEFINITION
+
+directive @auth(password: AuthRule, query: AuthRule, add: AuthRule, update: AuthRule, delete: AuthRule) on OBJECT | INTERFACE
+
+directive @lambda on FIELD_DEFINITION
+
+directive @cacheControl(maxAge: Int!) on QUERY
+
+directive @hasInverse(field: String!) on FIELD_DEFINITION
+
+directive @secret(field: String!, pred: String) on OBJECT | INTERFACE
+
+directive @remoteResponse(name: String) on FIELD_DEFINITION
+
+directive @cascade(fields: [String]) on FIELD
+
+directive @search(by: [DgraphIndex!]) on FIELD_DEFINITION
+
+directive @lambdaOnMutate(add: Boolean, update: Boolean, delete: Boolean) on OBJECT | INTERFACE
+
+input AddClientInput {
+  id: String!
+  name: String!
+  projects: [ProjectRef!]!
+  time_blocks: [TimeBlockRef!]!
+  user: String!
+}
+
+type AddClientPayload {
+  client(filter: ClientFilter, order: ClientOrder, first: Int, offset: Int): [Client]
+  numUids: Int
+}
+
+input AddInvoiceInput {
+  id: String!
+  custom_id: String
+  url: String
+  time_block: TimeBlockRef!
+}
+
+type AddInvoicePayload {
+  invoice(filter: InvoiceFilter, order: InvoiceOrder, first: Int, offset: Int): [Invoice]
+  numUids: Int
+}
+
+input AddProjectInput {
+  id: String!
+  name: String!
+  time_entries: [TimeEntryRef!]!
+  client: ClientRef!
+}
+
+type AddProjectPayload {
+  project(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project]
+  numUids: Int
+}
+
+input AddTimeBlockInput {
+  id: String!
+  name: String!
+  status: TimeBlockStatus!
+  duration: Int!
+  invoice: InvoiceRef
+  client: ClientRef!
+}
+
+type AddTimeBlockPayload {
+  timeBlock(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock]
+  numUids: Int
+}
+
+input AddTimeEntryInput {
+  id: String!
+  name: String!
+  started: DateTime!
+  stopped: DateTime
+  project: ProjectRef!
+}
+
+type AddTimeEntryPayload {
+  timeEntry(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry]
+  numUids: Int
+}
+
+input AuthRule {
+  and: [AuthRule]
+  or: [AuthRule]
+  not: AuthRule
+  rule: String
+}
+
+type Client {
+  id: String!
+  name: String!
+  projects(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project!]!
+  time_blocks(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock!]!
+  user: String!
+  projectsAggregate(filter: ProjectFilter): ProjectAggregateResult
+  time_blocksAggregate(filter: TimeBlockFilter): TimeBlockAggregateResult
+}
+
+type ClientAggregateResult {
+  count: Int
+  idMin: String
+  idMax: String
+  nameMin: String
+  nameMax: String
+  userMin: String
+  userMax: String
+}
+
+input ClientFilter {
+  id: StringHashFilter
+  has: [ClientHasFilter]
+  and: [ClientFilter]
+  or: [ClientFilter]
+  not: ClientFilter
+}
+
+enum ClientHasFilter {
+  id
+  name
+  projects
+  time_blocks
+  user
+}
+
+input ClientOrder {
+  asc: ClientOrderable
+  desc: ClientOrderable
+  then: ClientOrder
+}
+
+enum ClientOrderable {
+  id
+  name
+  user
+}
+
+input ClientPatch {
+  name: String
+  projects: [ProjectRef!]
+  time_blocks: [TimeBlockRef!]
+  user: String
+}
+
+input ClientRef {
+  id: String
+  name: String
+  projects: [ProjectRef!]
+  time_blocks: [TimeBlockRef!]
+  user: String
+}
+
+input ContainsFilter {
+  point: PointRef
+  polygon: PolygonRef
+}
+
+input CustomHTTP {
+  url: String!
+  method: HTTPMethod!
+  body: String
+  graphql: String
+  mode: Mode
+  forwardHeaders: [String!]
+  secretHeaders: [String!]
+  introspectionHeaders: [String!]
+  skipIntrospection: Boolean
+}
+
+"""
+The DateTime scalar type represents date and time as a string in RFC3339 format.
+For example: "1985-04-12T23:20:50.52Z" represents 20 minutes and 50.52 seconds
+after the 23rd hour of April 12th, 1985 in UTC.
+"""
+scalar DateTime
+
+input DateTimeFilter {
+  eq: DateTime
+  in: [DateTime]
+  le: DateTime
+  lt: DateTime
+  ge: DateTime
+  gt: DateTime
+  between: DateTimeRange
+}
+
+input DateTimeRange {
+  min: DateTime!
+  max: DateTime!
+}
+
+type DeleteClientPayload {
+  client(filter: ClientFilter, order: ClientOrder, first: Int, offset: Int): [Client]
+  msg: String
+  numUids: Int
+}
+
+type DeleteInvoicePayload {
+  invoice(filter: InvoiceFilter, order: InvoiceOrder, first: Int, offset: Int): [Invoice]
+  msg: String
+  numUids: Int
+}
+
+type DeleteProjectPayload {
+  project(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project]
+  msg: String
+  numUids: Int
+}
+
+type DeleteTimeBlockPayload {
+  timeBlock(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock]
+  msg: String
+  numUids: Int
+}
+
+type DeleteTimeEntryPayload {
+  timeEntry(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry]
+  msg: String
+  numUids: Int
+}
+
+enum DgraphIndex {
+  int
+  int64
+  float
+  bool
+  hash
+  exact
+  term
+  fulltext
+  trigram
+  regexp
+  year
+  month
+  day
+  hour
+  geo
+}
+
+input FloatFilter {
+  eq: Float
+  in: [Float]
+  le: Float
+  lt: Float
+  ge: Float
+  gt: Float
+  between: FloatRange
+}
+
+input FloatRange {
+  min: Float!
+  max: Float!
+}
+
+input GenerateMutationParams {
+  add: Boolean
+  update: Boolean
+  delete: Boolean
+}
+
+input GenerateQueryParams {
+  get: Boolean
+  query: Boolean
+  password: Boolean
+  aggregate: Boolean
+}
+
+enum HTTPMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+}
+
+"""
+The Int64 scalar type represents a signed 64‐bit numeric non‐fractional value.
+Int64 can represent values in range [-(2^63),(2^63 - 1)].
+"""
+scalar Int64
+
+input Int64Filter {
+  eq: Int64
+  in: [Int64]
+  le: Int64
+  lt: Int64
+  ge: Int64
+  gt: Int64
+  between: Int64Range
+}
+
+input Int64Range {
+  min: Int64!
+  max: Int64!
+}
+
+input IntersectsFilter {
+  polygon: PolygonRef
+  multiPolygon: MultiPolygonRef
+}
+
+input IntFilter {
+  eq: Int
+  in: [Int]
+  le: Int
+  lt: Int
+  ge: Int
+  gt: Int
+  between: IntRange
+}
+
+input IntRange {
+  min: Int!
+  max: Int!
+}
+
+type Invoice {
+  id: String!
+  custom_id: String
+  url: String
+  time_block(filter: TimeBlockFilter): TimeBlock!
+}
+
+type InvoiceAggregateResult {
+  count: Int
+  idMin: String
+  idMax: String
+  custom_idMin: String
+  custom_idMax: String
+  urlMin: String
+  urlMax: String
+}
+
+input InvoiceFilter {
+  id: StringHashFilter
+  has: [InvoiceHasFilter]
+  and: [InvoiceFilter]
+  or: [InvoiceFilter]
+  not: InvoiceFilter
+}
+
+enum InvoiceHasFilter {
+  id
+  custom_id
+  url
+  time_block
+}
+
+input InvoiceOrder {
+  asc: InvoiceOrderable
+  desc: InvoiceOrderable
+  then: InvoiceOrder
+}
+
+enum InvoiceOrderable {
+  id
+  custom_id
+  url
+}
+
+input InvoicePatch {
+  custom_id: String
+  url: String
+  time_block: TimeBlockRef
+}
+
+input InvoiceRef {
+  id: String
+  custom_id: String
+  url: String
+  time_block: TimeBlockRef
+}
+
+enum Mode {
+  BATCH
+  SINGLE
+}
+
+type MultiPolygon {
+  polygons: [Polygon!]!
+}
+
+input MultiPolygonRef {
+  polygons: [PolygonRef!]!
+}
+
+type Mutation {
+  addClient(input: [AddClientInput!]!, upsert: Boolean): AddClientPayload
+  updateClient(input: UpdateClientInput!): UpdateClientPayload
+  deleteClient(filter: ClientFilter!): DeleteClientPayload
+  addProject(input: [AddProjectInput!]!, upsert: Boolean): AddProjectPayload
+  updateProject(input: UpdateProjectInput!): UpdateProjectPayload
+  deleteProject(filter: ProjectFilter!): DeleteProjectPayload
+  addTimeEntry(input: [AddTimeEntryInput!]!, upsert: Boolean): AddTimeEntryPayload
+  updateTimeEntry(input: UpdateTimeEntryInput!): UpdateTimeEntryPayload
+  deleteTimeEntry(filter: TimeEntryFilter!): DeleteTimeEntryPayload
+  addTimeBlock(input: [AddTimeBlockInput!]!, upsert: Boolean): AddTimeBlockPayload
+  updateTimeBlock(input: UpdateTimeBlockInput!): UpdateTimeBlockPayload
+  deleteTimeBlock(filter: TimeBlockFilter!): DeleteTimeBlockPayload
+  addInvoice(input: [AddInvoiceInput!]!, upsert: Boolean): AddInvoicePayload
+  updateInvoice(input: UpdateInvoiceInput!): UpdateInvoicePayload
+  deleteInvoice(filter: InvoiceFilter!): DeleteInvoicePayload
+}
+
+input NearFilter {
+  distance: Float!
+  coordinate: PointRef!
+}
+
+type Point {
+  longitude: Float!
+  latitude: Float!
+}
+
+input PointGeoFilter {
+  near: NearFilter
+  within: WithinFilter
+}
+
+type PointList {
+  points: [Point!]!
+}
+
+input PointListRef {
+  points: [PointRef!]!
+}
+
+input PointRef {
+  longitude: Float!
+  latitude: Float!
+}
+
+type Polygon {
+  coordinates: [PointList!]!
+}
+
+input PolygonGeoFilter {
+  near: NearFilter
+  within: WithinFilter
+  contains: ContainsFilter
+  intersects: IntersectsFilter
+}
+
+input PolygonRef {
+  coordinates: [PointListRef!]!
+}
+
+type Project {
+  id: String!
+  name: String!
+  time_entries(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry!]!
+  client(filter: ClientFilter): Client!
+  time_entriesAggregate(filter: TimeEntryFilter): TimeEntryAggregateResult
+}
+
+type ProjectAggregateResult {
+  count: Int
+  idMin: String
+  idMax: String
+  nameMin: String
+  nameMax: String
+}
+
+input ProjectFilter {
+  id: StringHashFilter
+  has: [ProjectHasFilter]
+  and: [ProjectFilter]
+  or: [ProjectFilter]
+  not: ProjectFilter
+}
+
+enum ProjectHasFilter {
+  id
+  name
+  time_entries
+  client
+}
+
+input ProjectOrder {
+  asc: ProjectOrderable
+  desc: ProjectOrderable
+  then: ProjectOrder
+}
+
+enum ProjectOrderable {
+  id
+  name
+}
+
+input ProjectPatch {
+  name: String
+  time_entries: [TimeEntryRef!]
+  client: ClientRef
+}
+
+input ProjectRef {
+  id: String
+  name: String
+  time_entries: [TimeEntryRef!]
+  client: ClientRef
+}
+
+type Query {
+  getClient(id: String!): Client
+  queryClient(filter: ClientFilter, order: ClientOrder, first: Int, offset: Int): [Client]
+  aggregateClient(filter: ClientFilter): ClientAggregateResult
+  getProject(id: String!): Project
+  queryProject(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project]
+  aggregateProject(filter: ProjectFilter): ProjectAggregateResult
+  getTimeEntry(id: String!): TimeEntry
+  queryTimeEntry(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry]
+  aggregateTimeEntry(filter: TimeEntryFilter): TimeEntryAggregateResult
+  getTimeBlock(id: String!): TimeBlock
+  queryTimeBlock(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock]
+  aggregateTimeBlock(filter: TimeBlockFilter): TimeBlockAggregateResult
+  getInvoice(id: String!): Invoice
+  queryInvoice(filter: InvoiceFilter, order: InvoiceOrder, first: Int, offset: Int): [Invoice]
+  aggregateInvoice(filter: InvoiceFilter): InvoiceAggregateResult
+}
+
+input StringExactFilter {
+  eq: String
+  in: [String]
+  le: String
+  lt: String
+  ge: String
+  gt: String
+  between: StringRange
+}
+
+input StringFullTextFilter {
+  alloftext: String
+  anyoftext: String
+}
+
+input StringHashFilter {
+  eq: String
+  in: [String]
+}
+
+input StringRange {
+  min: String!
+  max: String!
+}
+
+input StringRegExpFilter {
+  regexp: String
+}
+
+input StringTermFilter {
+  allofterms: String
+  anyofterms: String
+}
+
+type TimeBlock {
+  id: String!
+  name: String!
+  status: TimeBlockStatus!
+  duration: Int!
+  invoice(filter: InvoiceFilter): Invoice
+  client(filter: ClientFilter): Client!
+}
+
+type TimeBlockAggregateResult {
+  count: Int
+  idMin: String
+  idMax: String
+  nameMin: String
+  nameMax: String
+  durationMin: Int
+  durationMax: Int
+  durationSum: Int
+  durationAvg: Float
+}
+
+input TimeBlockFilter {
+  id: StringHashFilter
+  has: [TimeBlockHasFilter]
+  and: [TimeBlockFilter]
+  or: [TimeBlockFilter]
+  not: TimeBlockFilter
+}
+
+enum TimeBlockHasFilter {
+  id
+  name
+  status
+  duration
+  invoice
+  client
+}
+
+input TimeBlockOrder {
+  asc: TimeBlockOrderable
+  desc: TimeBlockOrderable
+  then: TimeBlockOrder
+}
+
+enum TimeBlockOrderable {
+  id
+  name
+  duration
+}
+
+input TimeBlockPatch {
+  name: String
+  status: TimeBlockStatus
+  duration: Int
+  invoice: InvoiceRef
+  client: ClientRef
+}
+
+input TimeBlockRef {
+  id: String
+  name: String
+  status: TimeBlockStatus
+  duration: Int
+  invoice: InvoiceRef
+  client: ClientRef
+}
+
+enum TimeBlockStatus {
+  NON_BILLABLE
+  UNPAID
+  PAID
+}
+
+type TimeEntry {
+  id: String!
+  name: String!
+  started: DateTime!
+  stopped: DateTime
+  project(filter: ProjectFilter): Project!
+}
+
+type TimeEntryAggregateResult {
+  count: Int
+  idMin: String
+  idMax: String
+  nameMin: String
+  nameMax: String
+  startedMin: DateTime
+  startedMax: DateTime
+  stoppedMin: DateTime
+  stoppedMax: DateTime
+}
+
+input TimeEntryFilter {
+  id: StringHashFilter
+  has: [TimeEntryHasFilter]
+  and: [TimeEntryFilter]
+  or: [TimeEntryFilter]
+  not: TimeEntryFilter
+}
+
+enum TimeEntryHasFilter {
+  id
+  name
+  started
+  stopped
+  project
+}
+
+input TimeEntryOrder {
+  asc: TimeEntryOrderable
+  desc: TimeEntryOrderable
+  then: TimeEntryOrder
+}
+
+enum TimeEntryOrderable {
+  id
+  name
+  started
+  stopped
+}
+
+input TimeEntryPatch {
+  name: String
+  started: DateTime
+  stopped: DateTime
+  project: ProjectRef
+}
+
+input TimeEntryRef {
+  id: String
+  name: String
+  started: DateTime
+  stopped: DateTime
+  project: ProjectRef
+}
+
+input UpdateClientInput {
+  filter: ClientFilter!
+  set: ClientPatch
+  remove: ClientPatch
+}
+
+type UpdateClientPayload {
+  client(filter: ClientFilter, order: ClientOrder, first: Int, offset: Int): [Client]
+  numUids: Int
+}
+
+input UpdateInvoiceInput {
+  filter: InvoiceFilter!
+  set: InvoicePatch
+  remove: InvoicePatch
+}
+
+type UpdateInvoicePayload {
+  invoice(filter: InvoiceFilter, order: InvoiceOrder, first: Int, offset: Int): [Invoice]
+  numUids: Int
+}
+
+input UpdateProjectInput {
+  filter: ProjectFilter!
+  set: ProjectPatch
+  remove: ProjectPatch
+}
+
+type UpdateProjectPayload {
+  project(filter: ProjectFilter, order: ProjectOrder, first: Int, offset: Int): [Project]
+  numUids: Int
+}
+
+input UpdateTimeBlockInput {
+  filter: TimeBlockFilter!
+  set: TimeBlockPatch
+  remove: TimeBlockPatch
+}
+
+type UpdateTimeBlockPayload {
+  timeBlock(filter: TimeBlockFilter, order: TimeBlockOrder, first: Int, offset: Int): [TimeBlock]
+  numUids: Int
+}
+
+input UpdateTimeEntryInput {
+  filter: TimeEntryFilter!
+  set: TimeEntryPatch
+  remove: TimeEntryPatch
+}
+
+type UpdateTimeEntryPayload {
+  timeEntry(filter: TimeEntryFilter, order: TimeEntryOrder, first: Int, offset: Int): [TimeEntry]
+  numUids: Int
+}
+
+input WithinFilter {
+  polygon: PolygonRef!
+}
+

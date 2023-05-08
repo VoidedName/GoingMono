@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "fetch-api": "get-graphql-schema https://nameless-brook-400398.eu-central-1.aws.cloud.dgraph.io/graphql > schema.graphql"
+  },
+  "dependencies": {
+    "get-graphql-schema": "^2.1.2"
+  }
+}

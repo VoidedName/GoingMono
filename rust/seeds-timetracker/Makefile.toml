@@ -6,22 +6,30 @@ skip_core_tasks = true
 
 # ---- BASIC ----
 
+[tasks.fetch_api]
+description = "Fetch graphql api"
+script = [
+    "npm run fetch-api"
+]
+
 [tasks.watch]
 description = "Watch files and recompile the project on change"
 run_task = [
     { name = "build" },
 ]
 watch = true
+dependencies = ["fetch_api"]
 
 [tasks.serve]
 description = "Start server"
 install_crate = { crate_name = "trunk", binary = "trunk", test_arg = "-h" }
 command = "trunk"
 args = ["serve", "--port", "${PORT}"]
+dependencies = ["fetch_api"]
 
 [tasks.verify]
 description = "Format, lint with Clippy and run tests"
-dependencies = ["fmt", "clippy", "test_h_firefox"]
+dependencies = ["fetch_api", "fmt", "clippy", "test_h_firefox"]
 
 # ---- BUILD ----
 
@@ -30,12 +38,14 @@ description = "Build with wasm-pack"
 install_crate = { crate_name = "wasm-pack", binary = "wasm-pack", test_arg = "-V" }
 command = "wasm-pack"
 args = ["build", "--target", "web", "--out-name", "package", "--dev"]
+dependencies = ["fetch_api"]
 
 [tasks.build_release]
 description = "Build with wasm-pack in release mode"
 install_crate = { crate_name = "wasm-pack", binary = "wasm-pack", test_arg = "-V" }
 command = "wasm-pack"
 args = ["build", "--target", "web", "--out-name", "package"]
+dependencies = ["fetch_api"]
 
 # ---- LINT ----
 
@@ -44,12 +54,14 @@ description = "Lint with Clippy"
 install_crate = { rustup_component_name = "clippy", binary = "cargo-clippy", test_arg = "--help" }
 command = "cargo"
 args = ["clippy", "--all-features", "--", "--deny", "warnings", "--deny", "clippy::pedantic", "--deny", "clippy::nursery"]
+dependencies = ["fetch_api"]
 
 [tasks.fmt]
 description = "Format with rustfmt"
 install_crate = { rustup_component_name = "rustfmt", binary = "rustfmt", test_arg = "-V" }
 command = "cargo"
 args = ["fmt"]
+dependencies = ["fetch_api"]
 
 
 # ---- TEST ----
@@ -58,14 +70,17 @@ args = ["fmt"]
 description = "Run headless tests. Ex: 'cargo make test_h firefox'. Test envs: [chrome, firefox, safari]"
 extend = "test"
 args = ["test", "--headless", "--${@}"]
+dependencies = ["fetch_api"]
 
 [tasks.test_h_firefox]
 description = "Run headless tests with Firefox."
 extend = "test"
 args = ["test", "--headless", "--firefox"]
+dependencies = ["fetch_api"]
 
 [tasks.test]
 description = "Run tests. Ex: 'cargo make test firefox'. Test envs: [chrome, firefox, safari]"
 install_crate = { crate_name = "wasm-pack", binary = "wasm-pack", test_arg = "-V" }
 command = "wasm-pack"
 args = ["test", "--${@}"]
+dependencies = ["fetch_api"]

@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Local};
 use rusty_ulid::Ulid;
 use seed::{prelude::*, *};
+use crate::graphql;
 
 type ClientId = Ulid;
 type ProjectId = Ulid;
@@ -25,7 +26,7 @@ pub fn init(url: Url, _: &mut impl Orders<Msg>) -> Model {
 
 pub struct Model {
     changes_status: ChangesStatus,
-    errors: Vec<gloo_net::Error>,
+    errors: Vec<graphql::GraphQLError>,
 
     clients: RemoteData<BTreeMap<ClientId, Client>>
 }
@@ -56,7 +57,7 @@ struct Project {
 // ------ ------
 
 pub enum Msg {
-    ClientsFetched(Result<BTreeMap<ClientId, Client>, gloo_net::Error>),
+    ClientsFetched(Result<BTreeMap<ClientId, Client>, graphql::GraphQLError>),
     ChangesSaved(Option<gloo_net::Error>),
     ClearErrors,
 
@@ -77,7 +78,9 @@ pub enum Msg {
 
 pub fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
     match msg {
-        Msg::ClientsFetched(Ok(clients)) => {}
+        Msg::ClientsFetched(Ok(clients)) => {
+            
+        }
         Msg::ClientsFetched(Err(fetch_error)) => {}
 
         Msg::ChangesSaved(None) => {}

@@ -17,6 +17,7 @@ wasm-bindgen-test = "0.3.18"
 
 [dependencies]
 chrono = "0.4.24"
+cynic = { version = "2.2.8", features = ["serde_json"] }
 gloo-console = "0.2.3"
 gloo-net = "0.2.6"
 rusty_ulid = { version = "2.0.0", default-features = false, features = ["chrono", "rand", "serde"] }

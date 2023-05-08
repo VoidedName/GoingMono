@@ -74,3 +74,5 @@
 **!!! New Rust-only quickstart in development! => [Seeder](https://github.com/MartinKavik/seeder) !!!**
 
 ---
+
+graphql downloaded from my remote database (dgraph)

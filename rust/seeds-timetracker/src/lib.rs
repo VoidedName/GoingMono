@@ -2,12 +2,13 @@
 // @TODO: Remove.
 #![allow(dead_code, unused_variables)]
 
-use gloo_console::{error, log};
+use gloo_console::{error};
 use seed::{prelude::*, *};
-use gloo_net::http::{Request, Response};
+use gloo_net::http::{Request};
 use serde::Deserialize;
 
 mod page;
+mod graphql;
 
 const CLIENTS_AND_PROJECTS: &str = "clients_and_projects";
 const TIME_TRACKER: &str = "time_tracker";
