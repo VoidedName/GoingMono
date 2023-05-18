@@ -1,0 +1,15 @@
+{
+  "name": "wasm",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "watch-wasm": "cargo watch -C wasm -i .gitignore -s \"wasm-pack build --debug --target web --out-dir ../pkg --out-name assembly\"",
+    "dev": "vite",
+    "build": "cd wasm && wasm-pack build --release --target web --out-dir ../pkg --out-name assembly && cd .. && tsc && vite build"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.4",
+    "vite": "^4.3.8"
+  }
+}

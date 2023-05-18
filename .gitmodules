@@ -1,0 +1,3 @@
+[submodule "rust/voideds-lazy-wasm-template"]
+	path = rust/voideds-lazy-wasm-template
+	url = git@github.com:VoidedName/voideds-lazy-wasm-template.git
